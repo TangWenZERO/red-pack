@@ -69,6 +69,33 @@ const formatTimestamp = (value: number | null) => {
   }).format(date);
 };
 
+const extractErrorMessage = (err: unknown) => {
+  if (!err) return "未知错误";
+  if (typeof err === "string") return err;
+  if (err instanceof Error) {
+    const errorWithShortMessage = err as Error & {
+      shortMessage?: string;
+      info?: { error?: { message?: string } };
+      reason?: string;
+      data?: { message?: string };
+    };
+    return (
+      errorWithShortMessage.shortMessage ||
+      errorWithShortMessage.reason ||
+      errorWithShortMessage.info?.error?.message ||
+      errorWithShortMessage.data?.message ||
+      err.message
+    );
+  }
+  if (typeof err === "object") {
+    const maybeMessage = (err as { message?: string; error?: string }).message;
+    if (maybeMessage) return maybeMessage;
+    const maybeError = (err as { error?: string }).error;
+    if (maybeError) return maybeError;
+  }
+  return String(err);
+};
+
 export default function EthersWalletPage() {
   const provideRef = useRef<ethers.BrowserProvider | null>(null);
   const [account, setAccount] = useState<string | null>(null);
@@ -77,10 +104,12 @@ export default function EthersWalletPage() {
   const [contractInfo, setContractInfo] = useState<ContractInfo | null>(null);
   const [claimRecords, setClaimRecords] = useState<ClaimRecord[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [isConnecting, setIsConnecting] = useState(false);
   const [isFetching, setIsFetching] = useState(false);
   const [depositAmount, setDepositAmount] = useState("");
   const [isDepositing, setIsDepositing] = useState(false);
+  const [isClaiming, setIsClaiming] = useState(false);
   // 断开连接
   const tartDisconnect = useCallback(() => {
     provideRef.current = null;
@@ -90,8 +119,11 @@ export default function EthersWalletPage() {
     setContractInfo(null);
     setClaimRecords([]);
     setError(null);
+    setStatusMessage("已断开钱包连接");
     setDepositAmount("");
     setIsDepositing(false);
+    setIsClaiming(false);
+    setIsFetching(false);
   }, []);
   const getInformation = useCallback(async () => {
     const provider = provideRef.current;
@@ -106,14 +138,19 @@ export default function EthersWalletPage() {
         contractAbi,
         provider
       );
-      const [ownerValue, totalBalanceValue, totalCountValue, isEqualValue, users] =
-        await Promise.all([
-          contract.owner(),
-          contract.totalBalance(),
-          contract.totalCount(),
-          contract.isEqual(),
-          contract.getUser(),
-        ]);
+      const [
+        ownerValue,
+        totalBalanceValue,
+        totalCountValue,
+        isEqualValue,
+        users,
+      ] = await Promise.all([
+        contract.owner(),
+        contract.totalBalance(),
+        contract.totalCount(),
+        contract.isEqual(),
+        contract.getUser(),
+      ]);
 
       setContractInfo({
         owner: ethers.getAddress(ownerValue),
@@ -164,6 +201,7 @@ export default function EthersWalletPage() {
         await getInformation();
       } catch (err) {
         setError(err instanceof Error ? err.message : String(err));
+        setStatusMessage(null);
       } finally {
         setIsFetching(false);
       }
@@ -180,6 +218,8 @@ export default function EthersWalletPage() {
 
     try {
       setIsConnecting(true);
+      setStatusMessage(null);
+      setError(null);
       if (!provideRef.current) {
         provideRef.current = new ethers.BrowserProvider(window.ethereum);
       }
@@ -195,8 +235,11 @@ export default function EthersWalletPage() {
 
       const address = ethers.getAddress(accounts[0]);
       await getWallet({ account: address });
+      setStatusMessage("钱包连接成功");
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      const message = extractErrorMessage(err);
+      setError(message);
+      setStatusMessage(`连接失败：${message}`);
     } finally {
       setIsConnecting(false);
     }
@@ -267,12 +310,49 @@ export default function EthersWalletPage() {
 
       setDepositAmount("");
       await getWallet({ account });
+      setStatusMessage("存入成功");
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      const message = extractErrorMessage(err);
+      setError(message);
+      setStatusMessage(`存入失败：${message}`);
     } finally {
       setIsDepositing(false);
     }
   }, [account, depositAmount, getWallet]);
+  const handleClaimRedPacket = useCallback(async () => {
+    const provider = provideRef.current;
+
+    if (!provider || !account) {
+      setError("请先连接钱包");
+      setStatusMessage(null);
+      return;
+    }
+
+    try {
+      setIsClaiming(true);
+      setError(null);
+      setStatusMessage("领取中...");
+
+      const signer = await provider.getSigner();
+      const contract = new ethers.Contract(
+        CONTRACT_ADDRESS,
+        contractAbi,
+        signer
+      );
+
+      const tx = await contract.getRedPacked();
+      await tx.wait();
+
+      setStatusMessage("领取红包成功");
+      await getWallet({ account });
+    } catch (err) {
+      const message = extractErrorMessage(err);
+      setError(message);
+      setStatusMessage(`领取失败：${message}`);
+    } finally {
+      setIsClaiming(false);
+    }
+  }, [account, getWallet]);
   useEffect(() => {
     if (!window.ethereum) {
       setError("请先安装钱包");
@@ -341,23 +421,27 @@ export default function EthersWalletPage() {
           <button
             type="button"
             className="secondary-btn"
-            onClick={() => getWallet({ account: account || "" })}
-            disabled={!isConnected || isFetching}
+            onClick={tartDisconnect}
+            disabled={!isConnected}
           >
-            {isFetching ? "读取中..." : "刷新信息"}
+            断开连接
           </button>
-          {isConnected ? (
-            <button
-              type="button"
-              className="secondary-btn"
-              onClick={tartDisconnect}
-            >
-              断开连接
-            </button>
-          ) : null}
+          <button
+            type="button"
+            className="primary-btn"
+            onClick={handleClaimRedPacket}
+            disabled={!isConnected || isClaiming || isFetching}
+          >
+            {isClaiming ? "领取中..." : "领取红包"}
+          </button>
         </div>
 
         {error ? <div className="error-box">{error}</div> : null}
+        {statusMessage ? (
+          <div className="state-pill" style={{ marginTop: "1rem" }}>
+            {statusMessage}
+          </div>
+        ) : null}
 
         {isConnected ? (
           <div className="deposit-row">
@@ -455,7 +539,10 @@ export default function EthersWalletPage() {
               ) : claimRecords.length > 0 ? (
                 <div className="data-list">
                   {claimRecords.map((record, index) => (
-                    <div className="claim-entry" key={`${record.addr}-${record.time}-${index}`}>
+                    <div
+                      className="claim-entry"
+                      key={`${record.addr}-${record.time}-${index}`}
+                    >
                       <div className="data-item">
                         <span>序号</span>
                         <strong>{index + 1}</strong>
