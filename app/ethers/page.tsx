@@ -3,20 +3,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ethers } from "ethers";
 import redArtifact from "@/app/abi/Red.json";
+import { CONTRACT_ADDRESS } from "@/app/utils/utils";
+import styles from "./page.module.css";
 
-const CONTRACT_ADDRESS = "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512" as const;
 const contractAbi = (redArtifact as { abi: ethers.InterfaceAbi }).abi;
 
 declare global {
   interface Window {
-    ethereum?: {
-      request: (args: { method: string; params?: unknown[] }) => Promise<any>;
-      on?: (event: string, handler: (...args: any[]) => void) => void;
-      removeListener?: (
-        event: string,
-        handler: (...args: any[]) => void
-      ) => void;
-    };
+    ethereum?: any;
   }
 }
 
@@ -69,33 +63,6 @@ const formatTimestamp = (value: number | null) => {
   }).format(date);
 };
 
-const extractErrorMessage = (err: unknown) => {
-  if (!err) return "未知错误";
-  if (typeof err === "string") return err;
-  if (err instanceof Error) {
-    const errorWithShortMessage = err as Error & {
-      shortMessage?: string;
-      info?: { error?: { message?: string } };
-      reason?: string;
-      data?: { message?: string };
-    };
-    return (
-      errorWithShortMessage.shortMessage ||
-      errorWithShortMessage.reason ||
-      errorWithShortMessage.info?.error?.message ||
-      errorWithShortMessage.data?.message ||
-      err.message
-    );
-  }
-  if (typeof err === "object") {
-    const maybeMessage = (err as { message?: string; error?: string }).message;
-    if (maybeMessage) return maybeMessage;
-    const maybeError = (err as { error?: string }).error;
-    if (maybeError) return maybeError;
-  }
-  return String(err);
-};
-
 export default function EthersWalletPage() {
   const provideRef = useRef<ethers.BrowserProvider | null>(null);
   const [account, setAccount] = useState<string | null>(null);
@@ -104,12 +71,10 @@ export default function EthersWalletPage() {
   const [contractInfo, setContractInfo] = useState<ContractInfo | null>(null);
   const [claimRecords, setClaimRecords] = useState<ClaimRecord[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [isConnecting, setIsConnecting] = useState(false);
   const [isFetching, setIsFetching] = useState(false);
   const [depositAmount, setDepositAmount] = useState("");
   const [isDepositing, setIsDepositing] = useState(false);
-  const [isClaiming, setIsClaiming] = useState(false);
   // 断开连接
   const tartDisconnect = useCallback(() => {
     provideRef.current = null;
@@ -119,12 +84,9 @@ export default function EthersWalletPage() {
     setContractInfo(null);
     setClaimRecords([]);
     setError(null);
-    setStatusMessage("已断开钱包连接");
     setDepositAmount("");
     setIsDepositing(false);
-    setIsClaiming(false);
-    setIsFetching(false);
-  }, []);
+  }, [setClaimRecords, setContractInfo, setError]);
   const getInformation = useCallback(async () => {
     const provider = provideRef.current;
     if (!provider) {
@@ -138,6 +100,7 @@ export default function EthersWalletPage() {
         contractAbi,
         provider
       );
+
       const [
         ownerValue,
         totalBalanceValue,
@@ -201,7 +164,6 @@ export default function EthersWalletPage() {
         await getInformation();
       } catch (err) {
         setError(err instanceof Error ? err.message : String(err));
-        setStatusMessage(null);
       } finally {
         setIsFetching(false);
       }
@@ -218,8 +180,6 @@ export default function EthersWalletPage() {
 
     try {
       setIsConnecting(true);
-      setStatusMessage(null);
-      setError(null);
       if (!provideRef.current) {
         provideRef.current = new ethers.BrowserProvider(window.ethereum);
       }
@@ -235,11 +195,8 @@ export default function EthersWalletPage() {
 
       const address = ethers.getAddress(accounts[0]);
       await getWallet({ account: address });
-      setStatusMessage("钱包连接成功");
     } catch (err) {
-      const message = extractErrorMessage(err);
-      setError(message);
-      setStatusMessage(`连接失败：${message}`);
+      setError(err instanceof Error ? err.message : String(err));
     } finally {
       setIsConnecting(false);
     }
@@ -310,49 +267,12 @@ export default function EthersWalletPage() {
 
       setDepositAmount("");
       await getWallet({ account });
-      setStatusMessage("存入成功");
     } catch (err) {
-      const message = extractErrorMessage(err);
-      setError(message);
-      setStatusMessage(`存入失败：${message}`);
+      setError(err instanceof Error ? err.message : String(err));
     } finally {
       setIsDepositing(false);
     }
   }, [account, depositAmount, getWallet]);
-  const handleClaimRedPacket = useCallback(async () => {
-    const provider = provideRef.current;
-
-    if (!provider || !account) {
-      setError("请先连接钱包");
-      setStatusMessage(null);
-      return;
-    }
-
-    try {
-      setIsClaiming(true);
-      setError(null);
-      setStatusMessage("领取中...");
-
-      const signer = await provider.getSigner();
-      const contract = new ethers.Contract(
-        CONTRACT_ADDRESS,
-        contractAbi,
-        signer
-      );
-
-      const tx = await contract.getRedPacked();
-      await tx.wait();
-
-      setStatusMessage("领取红包成功");
-      await getWallet({ account });
-    } catch (err) {
-      const message = extractErrorMessage(err);
-      setError(message);
-      setStatusMessage(`领取失败：${message}`);
-    } finally {
-      setIsClaiming(false);
-    }
-  }, [account, getWallet]);
   useEffect(() => {
     if (!window.ethereum) {
       setError("请先安装钱包");
@@ -400,19 +320,19 @@ export default function EthersWalletPage() {
   const isConnected = useMemo(() => Boolean(account), [account]);
 
   return (
-    <main className="page-shell">
-      <section className="panel">
-        <div className="state-pill">ethers.js</div>
+    <main className={styles.pageShell}>
+      <section className={styles.panel}>
+        <div className={styles.statePill}>ethers.js</div>
         <h1>使用 ethers.js 连接钱包</h1>
         <p>
           连接浏览器钱包，查看账户基础信息，并直接通过 ethers.js
           读取合约的核心状态。
         </p>
 
-        <div className="action-row">
+        <div className={styles.actionRow}>
           <button
             type="button"
-            className="primary-btn"
+            className={styles.primaryBtn}
             onClick={connectContract}
             disabled={isConnecting}
           >
@@ -420,33 +340,29 @@ export default function EthersWalletPage() {
           </button>
           <button
             type="button"
-            className="secondary-btn"
-            onClick={tartDisconnect}
-            disabled={!isConnected}
+            className={styles.secondaryBtn}
+            onClick={() => getWallet({ account: account || "" })}
+            disabled={!isConnected || isFetching}
           >
-            断开连接
+            {isFetching ? "读取中..." : "刷新信息"}
           </button>
-          <button
-            type="button"
-            className="primary-btn"
-            onClick={handleClaimRedPacket}
-            disabled={!isConnected || isClaiming || isFetching}
-          >
-            {isClaiming ? "领取中..." : "领取红包"}
-          </button>
+          {isConnected ? (
+            <button
+              type="button"
+              className={styles.secondaryBtn}
+              onClick={tartDisconnect}
+            >
+              断开连接
+            </button>
+          ) : null}
         </div>
 
-        {error ? <div className="error-box">{error}</div> : null}
-        {statusMessage ? (
-          <div className="state-pill" style={{ marginTop: "1rem" }}>
-            {statusMessage}
-          </div>
-        ) : null}
+        {error ? <div className={styles.errorBox}>{error}</div> : null}
 
         {isConnected ? (
-          <div className="deposit-row">
+          <div className={styles.depositRow}>
             <input
-              className="input-field"
+              className={styles.inputField}
               type="number"
               min="0"
               step="0.0001"
@@ -457,7 +373,7 @@ export default function EthersWalletPage() {
             />
             <button
               type="button"
-              className="primary-btn"
+              className={styles.primaryBtn}
               onClick={handleDeposit}
               disabled={isDepositing || !depositAmount.trim()}
             >
@@ -466,22 +382,22 @@ export default function EthersWalletPage() {
           </div>
         ) : null}
 
-        <div className="info-grid">
-          <div className="info-card">
+        <div className={styles.infoGrid}>
+          <div className={styles.infoCard}>
             <h2>钱包信息</h2>
             {isConnected ? (
-              <div className="data-list">
-                <div className="data-item">
+              <div className={styles.dataList}>
+                <div className={styles.dataItem}>
                   <span>账户地址</span>
                   <strong title={account ?? ""}>
                     {formatAddress(account)}
                   </strong>
                 </div>
-                <div className="data-item">
+                <div className={styles.dataItem}>
                   <span>当前网络</span>
                   <strong>{describeNetwork(network)}</strong>
                 </div>
-                <div className="data-item">
+                <div className={styles.dataItem}>
                   <span>账户余额</span>
                   <strong>{`${formatEth(balance)} ETH`}</strong>
                 </div>
@@ -491,34 +407,34 @@ export default function EthersWalletPage() {
             )}
           </div>
 
-          <div className="info-card">
+          <div className={styles.infoCard}>
             <h2>合约信息</h2>
             {isConnected ? (
               contractInfo ? (
-                <div className="data-list">
-                  <div className="data-item">
+                <div className={styles.dataList}>
+                  <div className={styles.dataItem}>
                     <span>合约地址</span>
                     <strong title={CONTRACT_ADDRESS}>
                       {formatAddress(CONTRACT_ADDRESS)}
                     </strong>
                   </div>
-                  <div className="data-item">
+                  <div className={styles.dataItem}>
                     <span>Owner</span>
                     <strong title={contractInfo.owner}>
                       {formatAddress(contractInfo.owner)}
                     </strong>
                   </div>
-                  <div className="data-item">
+                  <div className={styles.dataItem}>
                     <span>总余额</span>
                     <strong>{`${formatEth(
                       contractInfo.totalBalance
                     )} ETH`}</strong>
                   </div>
-                  <div className="data-item">
+                  <div className={styles.dataItem}>
                     <span>红包数量</span>
                     <strong>{contractInfo.totalCount}</strong>
                   </div>
-                  <div className="data-item">
+                  <div className={styles.dataItem}>
                     <span>等额红包</span>
                     <strong>{contractInfo.isEqual ? "是" : "否"}</strong>
                   </div>
@@ -531,38 +447,40 @@ export default function EthersWalletPage() {
             )}
           </div>
 
-          <div className="info-card">
+          <div className={styles.infoCard}>
             <h2>领取记录</h2>
             {isConnected ? (
               isFetching ? (
                 <p>正在读取领取记录...</p>
               ) : claimRecords.length > 0 ? (
-                <div className="data-list">
-                  {claimRecords.map((record, index) => (
-                    <div
-                      className="claim-entry"
-                      key={`${record.addr}-${record.time}-${index}`}
-                    >
-                      <div className="data-item">
-                        <span>序号</span>
-                        <strong>{index + 1}</strong>
+                <div className={styles.claimRecordsContainer}>
+                  <div className={styles.dataList}>
+                    {claimRecords.map((record, index) => (
+                      <div
+                        className={styles.claimEntry}
+                        key={`${record.addr}-${record.time}-${index}`}
+                      >
+                        <div className={styles.dataItem}>
+                          <span>序号</span>
+                          <strong>{index + 1}</strong>
+                        </div>
+                        <div className={styles.dataItem}>
+                          <span>领取人</span>
+                          <strong title={record.addr}>
+                            {formatAddress(record.addr)}
+                          </strong>
+                        </div>
+                        <div className={styles.dataItem}>
+                          <span>领取金额</span>
+                          <strong>{`${formatEth(record.amount)} ETH`}</strong>
+                        </div>
+                        <div className={styles.dataItem}>
+                          <span>领取时间</span>
+                          <strong>{formatTimestamp(record.time)}</strong>
+                        </div>
                       </div>
-                      <div className="data-item">
-                        <span>领取人</span>
-                        <strong title={record.addr}>
-                          {formatAddress(record.addr)}
-                        </strong>
-                      </div>
-                      <div className="data-item">
-                        <span>领取金额</span>
-                        <strong>{`${formatEth(record.amount)} ETH`}</strong>
-                      </div>
-                      <div className="data-item">
-                        <span>领取时间</span>
-                        <strong>{formatTimestamp(record.time)}</strong>
-                      </div>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
               ) : (
                 <p>暂无领取记录。</p>

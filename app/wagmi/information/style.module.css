@@ -1,0 +1,173 @@
+.pageShell {
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 3.5rem 1.5rem 4rem;
+}
+
+.panel {
+  width: min(100%, 760px);
+  background: rgba(15, 23, 42, 0.7);
+  border-radius: 1.6rem;
+  padding: 2.75rem;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  backdrop-filter: blur(18px);
+  box-shadow: 0 22px 60px rgba(2, 6, 23, 0.48);
+}
+
+.panel h1 {
+  margin: 0 0 1rem;
+  font-size: clamp(2.1rem, 5vw, 2.8rem);
+}
+
+.panel p {
+  margin: 0;
+  color: var(--muted);
+}
+
+.statePill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.4rem 0.85rem;
+  border-radius: 999px;
+  background: rgba(56, 189, 248, 0.18);
+  color: #7dd3fc;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.actionRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 1.75rem;
+}
+
+.errorBox {
+  margin-top: 1.5rem;
+  padding: 1rem 1.2rem;
+  border-radius: 1rem;
+  border: 1px solid rgba(248, 113, 113, 0.55);
+  background: rgba(248, 113, 113, 0.14);
+  color: #fecaca;
+}
+
+.depositRow {
+  margin-top: 1.75rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.inputField {
+  flex: 1 1 220px;
+  min-width: 200px;
+  padding: 0.75rem 1rem;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.4);
+  background: rgba(15, 23, 42, 0.6);
+  color: var(--foreground);
+  transition: border-color 0.2s ease, background 0.2s ease;
+}
+
+.inputField:focus {
+  outline: none;
+  border-color: rgba(56, 189, 248, 0.6);
+  background: rgba(15, 23, 42, 0.85);
+}
+
+.inputField:disabled {
+  opacity: 0.6;
+}
+
+.primaryBtn {
+  padding: 0.75rem 1.65rem;
+  border-radius: 999px;
+  border: none;
+  font-weight: 600;
+  background: linear-gradient(135deg, #38bdf8, #22d3ee);
+  color: #041327;
+  box-shadow: 0 12px 24px rgba(34, 211, 238, 0.22);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.primaryBtn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  box-shadow: none;
+  transform: none;
+}
+
+.primaryBtn:not(:disabled):hover {
+  transform: translateY(-2px);
+  box-shadow: 0 18px 32px rgba(34, 211, 238, 0.28);
+}
+
+.infoGrid {
+  display: grid;
+  gap: 1.1rem;
+  margin-top: 2.25rem;
+}
+
+.infoCard {
+  padding: 1.3rem;
+  border-radius: 1.1rem;
+  background: rgba(30, 41, 59, 0.65);
+  border: 1px solid rgba(148, 163, 184, 0.18);
+}
+
+.infoCard h2 {
+  margin: 0 0 0.45rem;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.infoCard p {
+  margin: 0;
+  font-size: 0.95rem;
+  color: var(--muted);
+  word-break: break-word;
+}
+
+.dataList {
+  display: grid;
+  gap: 0.85rem;
+  margin-top: 1.75rem;
+}
+
+.dataItem {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  font-size: 0.96rem;
+}
+
+.dataItem span {
+  color: var(--muted);
+}
+
+.dataItem strong {
+  color: var(--foreground);
+  font-weight: 600;
+  word-break: break-all;
+  text-align: right;
+}
+
+.claimEntry {
+  padding: 0.8rem 0.2rem;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.16);
+}
+
+.claimEntry:last-child {
+  border-bottom: none;
+}
+
+@media (max-width: 640px) {
+  .panel {
+    padding: 2.2rem 1.6rem;
+  }
+}

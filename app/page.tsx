@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import styles from "./page.module.css";
 
 const links = [
   {
@@ -22,15 +23,15 @@ const links = [
 
 export default function HomePage() {
   return (
-    <main className="home-shell">
-      <section className="home-content">
+    <main className={styles.homeShell}>
+      <section className={styles.homeContent}>
         <h1>Red Packet Playground</h1>
-        <p className="home-subtitle">
+        <p className={styles.homeSubtitle}>
           选择不同的技术方案体验钱包连接与合约信息展示。
         </p>
-        <div className="home-actions">
+        <div className={styles.homeActions}>
           {links.map((link) => (
-            <Link key={link.href} href={link.href} className="home-button">
+            <Link key={link.href} href={link.href} className={styles.homeButton}>
               <span>{link.title}</span>
               <small>{link.description}</small>
             </Link>
