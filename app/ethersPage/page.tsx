@@ -3,12 +3,19 @@ import { ethers } from "ethers";
 import { useEffect, useRef, useState } from "react";
 import { CONTRACT_ADDRESS } from "@/app/utils/utils";
 import contractAbi from "@/app/abi/Red.json";
+import styles from "./style.module.css";
+import {
+  InformationPanel,
+  DepositSection,
+  EthersWalletActions,
+} from "@/app/components";
 
 const ABI = (contractAbi as { abi: ethers.InterfaceAbi }).abi;
 const EthersPage = () => {
   // 链接钱包状态
   const [isConnected, setIsConnected] = useState(false);
   const [isDepositing, setDepositing] = useState(false);
+  const [isCleared, setIsCleared] = useState(false);
 
   const provideRef = useRef<ethers.BrowserProvider | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -30,6 +37,25 @@ const EthersPage = () => {
   const [contractError, setContractError] = useState<string | null>(null);
   // 输入金额
   const [amount, setAmount] = useState<string>("");
+  // 清空红包
+  const clearRedPacked = async () => {
+    if (!provideRef.current || !account) {
+      setError("请先连接钱包");
+      return;
+    }
+    try {
+      const signer = await provideRef.current.getSigner();
+      const contract = new ethers.Contract(CONTRACT_ADDRESS, ABI, signer);
+      const tx = await contract.clearRedPacked();
+      await tx.wait();
+
+      // 领取成功后刷新账户和合约信息
+      await GetAccount({ account });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+      throw err;
+    }
+  };
   // 领取红包
   const claim = async () => {
     if (!provideRef.current || !account) {
@@ -45,8 +71,6 @@ const EthersPage = () => {
 
       // 领取成功后刷新账户和合约信息
       await GetAccount({ account });
-
-      return tx;
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
       throw err;
@@ -108,11 +132,15 @@ const EthersPage = () => {
     }
     setIsConnected(true);
     if (!provideRef.current) {
-      provideRef.current = new ethers.BrowserProvider(window.ethereum);
+      provideRef.current = new ethers.BrowserProvider(
+        window.ethereum as ethers.Eip1193Provider
+      );
     }
-    const accounts = (await window.ethereum.request({
-      method: "eth_requestAccounts",
-    })) as string[];
+    const accounts = (await (window.ethereum as ethers.Eip1193Provider).request(
+      {
+        method: "eth_requestAccounts",
+      }
+    )) as string[];
 
     if (!accounts || accounts.length === 0) {
       setError("未返回任何账户");
@@ -127,6 +155,7 @@ const EthersPage = () => {
   };
   // 获取合约信息
   const getContractInfo = () => {
+    console.log("getContractInfo");
     if (provideRef.current) {
       setError("先链接钱包");
       return;
@@ -170,9 +199,11 @@ const EthersPage = () => {
   };
   // 如果已经链接就获取用户账户信息
   const GetWallet = async () => {
-    const accounts = (await window.ethereum.request({
-      method: "eth_accounts",
-    })) as string[];
+    const accounts = (await (window.ethereum as ethers.Eip1193Provider).request(
+      {
+        method: "eth_accounts",
+      }
+    )) as string[];
     console.log(accounts);
     if (accounts.length > 0) {
       setAccount(accounts[0]);
@@ -187,32 +218,79 @@ const EthersPage = () => {
       return;
     }
 
-    if (!window.ethereum.on) {
-      setError("请升级钱包");
-      disconnectWallet();
-      return;
-    }
+    // if (!(window.ethereum as ethers.Eip1193Provider).on) {
+    //   setError("请升级钱包");
+    //   disconnectWallet();
+    //   return;
+    // }
     // 判断是否已经链接钱包
-    if (!provideRef.current) {
-      provideRef.current = new ethers.BrowserProvider(window.ethereum);
-    }
+    // if (!provideRef.current) {
+    //   provideRef.current = new ethers.BrowserProvider(
+    //     window.ethereum as ethers.Eip1193Provider
+    //   );
+    // }
     // 判断是否已经链接钱包
-    GetWallet();
+    // GetWallet();
 
-    function accountsChanged(accounts: string[]) {
-      if (accounts.length === 0) {
-        return;
-      }
-      GetWallet();
-    }
-    function chainChanged(chainId: string) {
-      if (chainId !== "0x1") {
-        return;
-      }
-    }
-    window.ethereum.on("accountsChanged", accountsChanged);
-    window.ethereum.on("chainChanged", chainChanged);
+    // function accountsChanged(accounts: string[]) {
+    //   if (accounts.length === 0) {
+    //     return;
+    //   }
+    //   GetWallet();
+    // }
+    // function chainChanged(chainId: string) {
+    //   if (chainId !== "0x1") {
+    //     return;
+    //   }
+    // }
+    // const eve = window.ethereum as ethers.Eip1193Provider;
+    // eve.on("accountsChanged", accountsChanged);
+    // eve.on("chainChanged", chainChanged);
+    // return () => {
+    //   eve.removeListener("accountsChanged", accountsChanged);
+    //   eve.removeListener("chainChanged", chainChanged);
+    // };
   }, []);
-  return <div>123456</div>;
+  return (
+    <main className={styles.pageShell}>
+      <section className={styles.panel}>
+        <div className={styles.statePill}>ethers.js</div>
+        <h1>使用 ethers.js 连接钱包</h1>
+        <p>
+          连接浏览器钱包，查看账户基础信息，并直接通过 ethers.js
+          读取合约的核心状态。
+        </p>
+
+        <div className=" py-4">
+          <EthersWalletActions
+            isCleared={account === ownerResult}
+            onClear={() => {}}
+            onClaim={async (provider) => {
+              await claim();
+            }}
+            onConnectSuccess={({ address, provider }) => {
+              setAccount(address);
+              provideRef.current = provider;
+              getContractInfo();
+            }}
+          />
+        </div>
+        {account === ownerResult && (
+          <DepositSection
+            value={amount}
+            onChange={setAmount}
+            onSubmit={deposit}
+          />
+        )}
+        <InformationPanel
+          walletInfo={{
+            address: account,
+            network: network?.name,
+            balance: balance,
+          }}
+        />
+      </section>
+    </main>
+  );
 };
 export default EthersPage;

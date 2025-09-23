@@ -1,0 +1,27 @@
+.pageShell {
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 3.5rem 1.5rem 4rem;
+}
+
+.panel {
+  width: min(100%, 860px);
+  background: rgba(15, 23, 42, 0.7);
+  border-radius: 1.6rem;
+  padding: 2.75rem;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  backdrop-filter: blur(18px);
+  box-shadow: 0 22px 60px rgba(2, 6, 23, 0.48);
+}
+
+.panel h1 {
+  margin: 0 0 1rem;
+  font-size: clamp(2.1rem, 5vw, 2.8rem);
+}
+
+.panel p {
+  margin: 0;
+  color: var(--muted);
+}
