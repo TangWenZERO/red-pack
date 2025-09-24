@@ -1,13 +1,13 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo } from "react";
 import styles from "./style.module.css";
-import { useAccount, useConnect, useReadContract, useBalance } from "wagmi";
-import { formatEther } from "viem";
+import { useAccount, useReadContract, useBalance } from "wagmi";
+import { formatEther, type Abi } from "viem";
 import { ConnectKitButton } from "connectkit";
 import { InformationPanel } from "@/app/components";
-import { CONTRACT_ADDRESS, formatTimestamp } from "@/app/utils/utils";
+import { CONTRACT_ADDRESS } from "@/app/utils/utils";
 import contractAbi from "@/app/abi/Red.json";
 import { WagmiButtonList } from "../buttonList";
-const ABI = (contractAbi as { abi: any }).abi;
+const ABI = (contractAbi as { abi: Abi }).abi;
 
 interface ClaimRecord {
   addr: string;
@@ -15,18 +15,9 @@ interface ClaimRecord {
   time: string;
 }
 const Container = () => {
-  const [txError, setTxError] = useState<string | null>(null);
   const { address, chain, isConnected } = useAccount();
-  const balance = useBalance({
+  const { data: balanceData, refetch: refetchBalance } = useBalance({
     address,
-  });
-  console.log(chain);
-  const [formattedData, setFormattedData] = useState({
-    totalBalance: "0",
-    owner: "",
-    totalCount: "0",
-    isEqual: false,
-    getUser: [] as ClaimRecord[],
   });
   // 读取合约数据
   const { data: totalBalanceData, refetch: refetchTotalBalance } =
@@ -61,77 +52,75 @@ const Container = () => {
   });
 
   // 格式化数据
-  useEffect(() => {
-    if (totalBalanceData) {
-      setFormattedData((prev) => ({
-        ...prev,
-        totalBalance: `${formatEther(totalBalanceData as bigint)} ETH`,
-      }));
-    }
-  }, [totalBalanceData]);
+  const contractInfo = useMemo(
+    () => ({
+      contractAddress: CONTRACT_ADDRESS,
+      owner: ownerData as string | undefined,
+      totalBalance: totalBalanceData
+        ? `${formatEther(totalBalanceData as bigint)} ETH`
+        : undefined,
+      totalCount: totalCountData ? totalCountData.toString() : undefined,
+      isEqual: isEqualData as boolean | undefined,
+    }),
+    [isEqualData, ownerData, totalBalanceData, totalCountData]
+  );
 
-  useEffect(() => {
-    if (ownerData !== undefined) {
-      setFormattedData((prev) => ({
-        ...prev,
-        owner: ownerData as string,
-      }));
-    }
-  }, [ownerData]);
-  useEffect(() => {
-    if (totalCountData) {
-      setFormattedData((prev) => ({
-        ...prev,
-        totalCount: totalCountData.toString(),
-      }));
-    }
-  }, [totalCountData]);
+  type RawUser =
+    | { addr: string; amount: bigint; time: bigint }
+    | readonly [string, bigint, bigint];
 
-  useEffect(() => {
-    if (isEqualData !== undefined) {
-      setFormattedData((prev) => ({
-        ...prev,
-        isEqual: isEqualData as boolean,
-      }));
+  const claimRecords = useMemo<ClaimRecord[]>(() => {
+    if (!Array.isArray(getUserData)) {
+      return [];
     }
-  }, [isEqualData]);
-  useEffect(() => {
-    if (getUserData !== undefined) {
-      const formattedUserList = (getUserData as any[]).map((item) => {
-        console.log(
-          "item:",
-          item.time,
-          formatTimestamp(Number(item.time || item[2]))
-        );
-        return {
-          addr: item?.addr || item[0],
-          amount: `${formatEther(item.amount || item[1])} ETH`,
-          time: `${item.time || item[2]}`,
-        };
-      });
-      console.log("formattedUserList:", formattedUserList);
-      setFormattedData((prev) => ({
-        ...prev,
-        getUser: formattedUserList,
-      }));
-    }
+
+    return (getUserData as ReadonlyArray<RawUser>).map((item) => {
+      const normalized = Array.isArray(item)
+        ? { addr: item[0], amount: item[1], time: item[2] }
+        : item;
+
+      return {
+        addr: normalized.addr,
+        amount: `${formatEther(normalized.amount)} ETH`,
+        time: normalized.time.toString(),
+      };
+    });
   }, [getUserData]);
-  console.log("getUserData:", getUserData);
-  // 刷新所有数据
-  const refreshAllData = () => {
-    console.log("888888");
-    refetchTotalBalance();
-    refetchOwner();
-    refetchTotalCount();
-    refetchIsEqual();
-    refetchGetUser();
-  };
+
+  const walletInfo = useMemo(
+    () => ({
+      address,
+      network: chain?.name,
+      balance: balanceData ? `${formatEther(balanceData.value)} ETH` : undefined,
+    }),
+    [address, balanceData, chain]
+  );
+
+  const refreshAllData = useCallback(async () => {
+    const refetchers = [
+      refetchTotalBalance,
+      refetchOwner,
+      refetchTotalCount,
+      refetchIsEqual,
+      refetchGetUser,
+      refetchBalance,
+    ].filter(Boolean) as Array<() => Promise<unknown>>;
+
+    await Promise.allSettled(refetchers.map((refetch) => refetch()));
+  }, [
+    refetchBalance,
+    refetchGetUser,
+    refetchIsEqual,
+    refetchOwner,
+    refetchTotalBalance,
+    refetchTotalCount,
+  ]);
   // 当钱包连接状态改变时刷新数据
   useEffect(() => {
     if (isConnected) {
-      refreshAllData();
+      void refreshAllData();
     }
-  }, [isConnected]);
+  }, [isConnected, refreshAllData]);
 
   return (
     <main className={styles.pageShell}>
@@ -147,30 +136,14 @@ const Container = () => {
         </p>
         <div>
           <WagmiButtonList
-            onClaimSuccess={() => {
-              refreshAllData();
-            }}
+            onActionComplete={refreshAllData}
           />
         </div>
-        {txError ? <div className={styles.errorBox}>{txError}</div> : null}
-
         <InformationPanel
-          walletInfo={{
-            address: address,
-            network: chain?.name,
-            balance: balance.data
-              ? `${formatEther(balance.data.value)} ETH`
-              : undefined,
-          }}
-          contractInfo={{
-            contractAddress: CONTRACT_ADDRESS,
-            owner: formattedData.owner,
-            totalBalance: formattedData.totalBalance,
-            totalCount: formattedData.totalCount,
-            isEqual: formattedData.isEqual,
-          }}
-          claimRecords={formattedData.getUser || []}
-          isConnected={address !== null}
+          walletInfo={walletInfo}
+          contractInfo={contractInfo}
+          claimRecords={claimRecords}
+          isConnected={Boolean(address)}
         />
       </section>
     </main>

@@ -1,15 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useState } from "react";
 import { writeContract, waitForTransactionReceipt } from "wagmi/actions";
-import {
-  useAccount,
-  useConnect,
-  useDisconnect,
-  useWriteContract,
-  useWaitForTransactionReceipt,
-  type Connector,
-} from "wagmi";
+import { useAccount } from "wagmi";
 import { BaseError, parseEther, type Abi } from "viem";
 import redArtifact from "@/app/abi/Red.json";
 import styles from "./ButtonList.module.css";
@@ -51,156 +44,139 @@ const extractErrorMessage = (err: unknown) => {
 };
 
 type WagmiButtonListProps = {
-  onClaimSuccess?: () => void;
+  onActionComplete?: () => Promise<void> | void;
+};
+
+type ActionType = "claim" | "clear" | "deposit";
+
+const actionLabels: Record<ActionType, string> = {
+  claim: "领取红包",
+  clear: "清空红包",
+  deposit: "存入金额",
 };
 
 export default function WagmiButtonList({
-  onClaimSuccess,
+  onActionComplete,
 }: WagmiButtonListProps) {
-  const [txError, setTxError] = useState<string | null>(null);
   const [depositAmount, setDepositAmount] = useState("");
-  // 链接钱包的状态信息
-  const { address, status: accountStatus, isConnected } = useAccount();
-  // 账户链接钱包
-  const {
-    connectAsync,
-    connectors,
-    isPending: isConnectPending,
-  } = useConnect();
-  // 钱包断开链接的hooks
-  const { disconnectAsync, isPending: isDisconnectPending } = useDisconnect();
-  // 在合约上面执行写入的功能
-  const { writeContractAsync, isPending: isWritePending } = useWriteContract();
+  const { address, isConnected } = useAccount();
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [pendingHash, setPendingHash] = useState<`0x${string}` | undefined>();
-  // 等待交易被打包到区块，然后返回交易收据的钩子
-  const { isLoading, isError, isSuccess } = useWaitForTransactionReceipt({
-    hash: pendingHash,
-  });
-  console.log("isSuccess", isSuccess);
-  // if (isSuccess) {
-  //   onClaimSuccess?.();
-  // }
-  const isConfirming = isLoading;
-  useEffect(() => {
-    if (isSuccess) {
-      console.log("请求");
-      onClaimSuccess?.();
-    }
-  }, [isSuccess]);
+  const [activeAction, setActiveAction] = useState<ActionType | null>(null);
+  const isProcessing = activeAction !== null;
+  const requireConnection = !isConnected || !address;
 
-  // console.log("result:", result);
+  const runTransaction = useCallback(
+    async (
+      action: ActionType,
+      trigger: () => Promise<`0x${string}`>,
+      successMessage: string,
+      afterSuccess?: () => void
+    ) => {
+      if (requireConnection) {
+        setErrorMessage("请先连接钱包");
+        setStatusMessage(null);
+        return;
+      }
 
-  // console.log("accountStatus:", accountStatus);
-
-  // 当交易确认完成后执行的操作
-  // useEffect(() => {
-  //   if (result.isSuccess) {
-  //     setStatusMessage("交易已确认");
-  //     // 交易成功确认后调用 onClaimSuccess 刷新数据
-  //     onClaimSuccess?.();
-  //     // 清除交易状态
-  //     setPendingHash(undefined);
-  //   }
-
-  //   if (result.isError) {
-  //     setErrorMessage("交易失败");
-  //     setStatusMessage(null);
-  //     setPendingHash(undefined);
-  //   }
-  // }, [result.isSuccess, result.isError, onClaimSuccess]);
-
-  // 领取红包
-  const handleClaim = useCallback(async () => {
-    if (!isConnected || !address) {
-      setErrorMessage("请先连接钱包");
-      setStatusMessage(null);
-      return;
-    }
-
-    try {
-      setStatusMessage("领取中...");
+      setActiveAction(action);
+      setStatusMessage(`${actionLabels[action]}提交中...`);
       setErrorMessage(null);
-      const hash = await writeContractAsync({
-        address: CONTRACT_ADDRESS,
-        abi: contractAbi,
-        functionName: "getRedPacked",
-      });
-      await waitForTransactionReceipt(wagmiConfig, { hash });
-      onClaimSuccess?.();
-      // setPendingHash(hash);
-    } catch (err) {
-      const message = extractErrorMessage(err);
-      setErrorMessage(message);
-      setStatusMessage(`领取失败：${message}`);
-    }
-  }, [address, isConnected, writeContractAsync]);
-  // 清空红包
-  const handleClear = useCallback(async () => {
-    if (!isConnected || !address) {
+
+      try {
+        const hash = await trigger();
+        setStatusMessage("交易确认中...");
+        await waitForTransactionReceipt(wagmiConfig, { hash });
+        afterSuccess?.();
+        setStatusMessage(successMessage);
+        if (onActionComplete) {
+          await onActionComplete();
+        }
+      } catch (err) {
+        const message = extractErrorMessage(err);
+        setErrorMessage(message);
+        setStatusMessage(`${actionLabels[action]}失败：${message}`);
+      } finally {
+        setActiveAction(null);
+      }
+    },
+    [onActionComplete, requireConnection]
+  );
+
+  const handleClaim = useCallback(() => {
+    void runTransaction(
+      "claim",
+      () =>
+        writeContract(wagmiConfig, {
+          address: CONTRACT_ADDRESS,
+          abi: contractAbi,
+          functionName: "getRedPacked",
+        }),
+      "领取成功"
+    );
+  }, [runTransaction]);
+
+  const handleClear = useCallback(() => {
+    void runTransaction(
+      "clear",
+      () =>
+        writeContract(wagmiConfig, {
+          address: CONTRACT_ADDRESS,
+          abi: contractAbi,
+          functionName: "clearRedPacked",
+        }),
+      "清空成功"
+    );
+  }, [runTransaction]);
+
+  const handleDeposit = useCallback(async () => {
+    if (requireConnection) {
       setErrorMessage("请先连接钱包");
       setStatusMessage(null);
-      return;
-    }
-    try {
-      const hash = await writeContractAsync({
-        address: address,
-        abi: contractAbi,
-        functionName: "clear",
-      });
-      await waitForTransactionReceipt(wagmiConfig, { hash });
-      onClaimSuccess?.();
-    } catch (error) {}
-  }, []);
-  // 存入红包
-  const handleDeposit = useCallback(async () => {
-    if (!address) {
-      setErrorMessage("请先连接钱包");
       return;
     }
 
     const amountText = depositAmount.trim();
     if (!amountText) {
       setErrorMessage("请输入存入金额");
+      setStatusMessage(null);
       return;
     }
 
     let amountInWei: bigint;
     try {
       amountInWei = parseEther(amountText);
-    } catch (err) {
+    } catch {
       setErrorMessage("请输入合法的 ETH 金额");
+      setStatusMessage(null);
       return;
     }
 
-    if (amountInWei <= 0) {
+    if (amountInWei <= 0n) {
       setErrorMessage("金额必须大于 0");
+      setStatusMessage(null);
       return;
     }
 
-    try {
-      setErrorMessage(null);
-      const hash = await writeContractAsync({
-        address: CONTRACT_ADDRESS,
-        abi: contractAbi,
-        functionName: "deposit",
-        value: amountInWei,
-      });
-      setDepositAmount("");
-      setStatusMessage("存入成功");
-      await waitForTransactionReceipt(wagmiConfig, { hash });
-      onClaimSuccess?.();
-    } catch (error) {
-      if (error instanceof BaseError) {
-        setErrorMessage(error.shortMessage ?? error.message);
-      } else if (error instanceof Error) {
-        setErrorMessage(error.message);
-      } else {
-        setErrorMessage(String(error));
-      }
-    }
-  }, [address, depositAmount, writeContractAsync]);
+    await runTransaction(
+      "deposit",
+      () =>
+        writeContract(wagmiConfig, {
+          address: CONTRACT_ADDRESS,
+          abi: contractAbi,
+          functionName: "deposit",
+          value: amountInWei,
+        }),
+      "存入成功",
+      () => setDepositAmount("")
+    );
+  }, [depositAmount, requireConnection, runTransaction]);
+
+  const claimLabel = activeAction === "claim" ? "领取中..." : actionLabels.claim;
+  const clearLabel = activeAction === "clear" ? "清空中..." : actionLabels.clear;
+  const depositLabel =
+    activeAction === "deposit" ? "存入中..." : actionLabels.deposit;
+
   return (
     <>
       <div className={styles.buttonList}>
@@ -208,17 +184,17 @@ export default function WagmiButtonList({
           type="button"
           className={styles.primaryBtn}
           onClick={handleClaim}
-          disabled={!isConnected || isWritePending || Boolean(pendingHash)}
+          disabled={requireConnection || isProcessing}
         >
-          {isWritePending || pendingHash ? "领取中..." : "领取红包"}
+          {claimLabel}
         </button>
         <button
           type="button"
           className={styles.primaryBtn}
           onClick={handleClear}
-          disabled={!isConnected || isWritePending || Boolean(pendingHash)}
+          disabled={requireConnection || isProcessing}
         >
-          清空红包
+          {clearLabel}
         </button>
         {statusMessage ? (
           <div className={styles.statusPill} style={{ marginTop: "1rem" }}>
@@ -238,17 +214,19 @@ export default function WagmiButtonList({
           placeholder="请输入存入的 ETH 数量"
           value={depositAmount}
           onChange={(event) => setDepositAmount(event.target.value)}
-          disabled={isWritePending || isConfirming}
+          disabled={isProcessing}
         />
         <button
           type="button"
           className={styles.primaryBtn}
           onClick={handleDeposit}
           disabled={
-            isWritePending || isConfirming || depositAmount.trim().length === 0
+            requireConnection ||
+            isProcessing ||
+            depositAmount.trim().length === 0
           }
         >
-          {isWritePending || isConfirming ? "存入中..." : "存入金额"}
+          {depositLabel}
         </button>
       </div>
     </>
