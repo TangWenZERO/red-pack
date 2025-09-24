@@ -29,14 +29,13 @@ export default function DepositSection({
     [onChange]
   );
 
-  const handleSubmit = useCallback(() => {
+  const handleSubmit = () => {
     if (disabled || isSubmitting) return;
     void onSubmit();
-  }, [disabled, isSubmitting, onSubmit]);
+  };
 
   const trimmed = value.trim();
-  const submitDisabled =
-    disabled || isSubmitting || trimmed.length === 0;
+  const submitDisabled = disabled || isSubmitting || trimmed.length === 0;
 
   return (
     <div className={styles.depositRow}>

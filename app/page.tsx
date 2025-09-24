@@ -5,7 +5,7 @@ import styles from "./page.module.css";
 
 const links = [
   {
-    href: "/ethers",
+    href: "/ethersPage",
     title: "Ethers.js 钱包",
     description: "使用 ethers.js 连接钱包并读取合约信息",
   },
@@ -31,7 +31,11 @@ export default function HomePage() {
         </p>
         <div className={styles.homeActions}>
           {links.map((link) => (
-            <Link key={link.href} href={link.href} className={styles.homeButton}>
+            <Link
+              key={link.href}
+              href={link.href}
+              className={styles.homeButton}
+            >
               <span>{link.title}</span>
               <small>{link.description}</small>
             </Link>

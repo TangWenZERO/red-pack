@@ -1,8 +1,10 @@
 import styles from "./page.module.css";
+import StarField from "./StarField";
 
 export default function CoolShowcasePage() {
   return (
     <main className={styles.frostedStage}>
+      <StarField />
       <div className={`${styles.frostedOrb} ${styles.orbOne}`} />
       <div className={`${styles.frostedOrb} ${styles.orbTwo}`} />
       <div className={`${styles.frostedOrb} ${styles.orbThree}`} />

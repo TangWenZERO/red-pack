@@ -3,12 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ethers } from "ethers";
 import styles from "./styles.module.css";
-
-declare global {
-  interface Window {
-    ethereum?: unknown;
-  }
-}
+import { on } from "events";
 
 const extractErrorMessage = (err: unknown) => {
   if (!err) return "未知错误";
@@ -22,6 +17,7 @@ const extractErrorMessage = (err: unknown) => {
 };
 
 export interface EthersWalletActionsProps {
+  onClear?: () => void | Promise<void>;
   onConnectSuccess?: (payload: {
     address: string;
     provider: ethers.BrowserProvider;
@@ -33,17 +29,20 @@ export interface EthersWalletActionsProps {
   connectButtonText?: string;
   disconnectButtonText?: string;
   claimButtonText?: string;
+  isCleared?: boolean;
 }
 
 export default function EthersWalletActions({
   onConnectSuccess,
   onClaim,
   onClaimError,
+  onClear,
   claimDisabled,
   claimLoading,
   connectButtonText = "链接钱包",
   disconnectButtonText = "断开连接",
   claimButtonText = "领取红包",
+  isCleared = false,
 }: EthersWalletActionsProps) {
   const providerRef = useRef<ethers.BrowserProvider | null>(null);
   const [account, setAccount] = useState<string | null>(null);
@@ -56,10 +55,29 @@ export default function EthersWalletActions({
   useEffect(() => {
     setIsClient(true);
   }, []);
+  const checkWalletConnection = async () => {
+    try {
+      const provider = new ethers.BrowserProvider(window.ethereum as any);
+      providerRef.current = provider;
 
+      // Check if accounts are already authorized
+      const accounts = await provider.send("eth_accounts", []);
+      if (accounts && accounts.length > 0) {
+        const normalized = ethers.getAddress(accounts[0]!);
+        setAccount(normalized);
+        setStatusMessage("检测到已连接的钱包");
+
+        // Notify parent component about the existing connection
+        await onConnectSuccess?.({ address: normalized, provider });
+      }
+    } catch (err) {
+      // Silently handle errors in connection check
+      console.debug("Wallet connection check failed:", err);
+    }
+  };
   useEffect(() => {
     if (!isClient || !window?.ethereum) return;
-
+    checkWalletConnection();
     const handleAccountsChanged = (accounts: string[]) => {
       if (!accounts || accounts.length === 0) {
         setAccount(null);
@@ -68,16 +86,37 @@ export default function EthersWalletActions({
       try {
         const normalized = ethers.getAddress(accounts[0]!);
         setAccount(normalized);
+        if (onConnectSuccess) {
+          onConnectSuccess?.({
+            address: normalized,
+            provider: providerRef.current!,
+          });
+        }
       } catch {
         setAccount(accounts[0] ?? null);
       }
     };
+    const handleChainChanged = (chainId: string) => {
+      if (chainId) {
+        if (onConnectSuccess && account && providerRef.current) {
+          onConnectSuccess?.({
+            address: account,
+            provider: providerRef.current,
+          });
+        }
+      }
+    };
 
     (window.ethereum as any).on?.("accountsChanged", handleAccountsChanged);
+    (window.ethereum as any).on?.("chainChanged", handleChainChanged);
     return () => {
       (window.ethereum as any)?.removeListener?.(
         "accountsChanged",
         handleAccountsChanged
+      );
+      (window.ethereum as any)?.removeListener?.(
+        "chainChanged",
+        handleChainChanged
       );
     };
   }, [isClient]);
@@ -162,6 +201,35 @@ export default function EthersWalletActions({
     }
   }, [onClaim, onClaimError]);
 
+  const handleClear = async () => {
+    if (!onClear) {
+      setErrorMessage("未提供清空红包的方法");
+      setStatusMessage(null);
+      return;
+    }
+    try {
+      const provider = providerRef.current;
+      if (!provider) {
+        setErrorMessage("请先连接钱包");
+        setStatusMessage(null);
+        return;
+      }
+      setIsClaimingInternal(true);
+      setErrorMessage(null);
+      console.log("5555");
+
+      await onClear();
+      setStatusMessage("清空请求已发送");
+    } catch (err) {
+      const message = extractErrorMessage(err);
+      setErrorMessage(message);
+      setStatusMessage(`清空失败：${message}`);
+    } finally {
+      console.log("6666");
+      setIsClaimingInternal(false);
+    }
+  };
+
   if (!isClient) {
     return null;
   }
@@ -172,9 +240,13 @@ export default function EthersWalletActions({
         type="button"
         className={styles.primaryBtn}
         onClick={handleConnect}
-        disabled={isConnecting}
+        disabled={isConnecting || isConnected}
       >
-        {isConnecting ? "连接中..." : isConnected ? "已连接" : connectButtonText}
+        {isConnecting
+          ? "连接中..."
+          : isConnected
+          ? "已连接"
+          : connectButtonText}
       </button>
       <button
         type="button"
@@ -192,6 +264,16 @@ export default function EthersWalletActions({
       >
         {isClaimInFlight ? "领取中..." : claimButtonText}
       </button>
+      {isCleared && (
+        <button
+          type="button"
+          className={styles.primaryBtn}
+          onClick={handleClear}
+          disabled={!isConnected || claimDisabled || isClaimInFlight}
+        >
+          清空红包
+        </button>
+      )}
 
       {statusMessage ? (
         <div className={styles.statusPill} style={{ marginTop: "1rem" }}>

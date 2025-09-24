@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { writeContract, waitForTransactionReceipt } from "wagmi/actions";
 import {
   useAccount,
   useConnect,
@@ -12,8 +13,7 @@ import {
 import { BaseError, parseEther, type Abi } from "viem";
 import redArtifact from "@/app/abi/Red.json";
 import styles from "./ButtonList.module.css";
-// 在前端开发（React）里，createPortal 是 React 提供的一个 API，用来把 子组件渲染到当前组件 DOM 树以外的地方
-import { createPortal } from "react-dom";
+import { wagmiConfig } from "@/app/utils/wagmiConfig";
 
 import { CONTRACT_ADDRESS } from "@/app/utils/utils";
 const contractAbi = (redArtifact as { abi: Abi }).abi;
@@ -51,7 +51,7 @@ const extractErrorMessage = (err: unknown) => {
 };
 
 type WagmiButtonListProps = {
-  onClaimSuccess?: () => void | Promise<void>;
+  onClaimSuccess?: () => void;
 };
 
 export default function WagmiButtonList({
@@ -74,66 +74,44 @@ export default function WagmiButtonList({
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [pendingHash, setPendingHash] = useState<`0x${string}` | undefined>();
-  const [isModalOpen, setIsModalOpen] = useState(false);
   // 等待交易被打包到区块，然后返回交易收据的钩子
-  const result = useWaitForTransactionReceipt({
+  const { isLoading, isError, isSuccess } = useWaitForTransactionReceipt({
     hash: pendingHash,
   });
-  const isConfirming = result.isLoading;
-
-  console.log("result:", result);
-
-  console.log("accountStatus:", accountStatus);
-  const closeModal = useCallback(() => {
-    setIsModalOpen(false);
-  }, []);
-  /** 链接钱包 */
-  const performConnect = useCallback(
-    async (connector: Connector) => {
-      setIsModalOpen(false);
-      try {
-        setStatusMessage(`正在连接 ${connector.name}...`);
-        setErrorMessage(null);
-        await connectAsync({ connector });
-        setStatusMessage("钱包连接成功");
-        setIsModalOpen(false);
-      } catch (err) {
-        const message = extractErrorMessage(err);
-        setErrorMessage(message);
-        setStatusMessage(`连接失败：${message}`);
-      }
-    },
-    [connectAsync]
-  );
-  /** 弹窗 */
-  const openModal = useCallback(() => {
-    setStatusMessage(null);
-    setErrorMessage(null);
-    setIsModalOpen(true);
-    console.log("connectors:", connectors);
-  }, []);
-
-  // 断开连接钱包
-  const handleDisconnect = useCallback(async () => {
-    if (!isConnected) {
-      setStatusMessage("当前没有连接的钱包");
-      setErrorMessage(null);
-      return;
+  console.log("isSuccess", isSuccess);
+  // if (isSuccess) {
+  //   onClaimSuccess?.();
+  // }
+  const isConfirming = isLoading;
+  useEffect(() => {
+    if (isSuccess) {
+      console.log("请求");
+      onClaimSuccess?.();
     }
+  }, [isSuccess]);
 
-    try {
-      setStatusMessage("断开连接中...");
-      setErrorMessage(null);
-      await disconnectAsync();
-      setStatusMessage("已断开钱包连接");
-      setIsModalOpen(false);
-    } catch (err) {
-      const message = extractErrorMessage(err);
-      setErrorMessage(message);
-      setStatusMessage(`断开失败：${message}`);
-    }
-  }, [disconnectAsync, isConnected]);
+  // console.log("result:", result);
 
+  // console.log("accountStatus:", accountStatus);
+
+  // 当交易确认完成后执行的操作
+  // useEffect(() => {
+  //   if (result.isSuccess) {
+  //     setStatusMessage("交易已确认");
+  //     // 交易成功确认后调用 onClaimSuccess 刷新数据
+  //     onClaimSuccess?.();
+  //     // 清除交易状态
+  //     setPendingHash(undefined);
+  //   }
+
+  //   if (result.isError) {
+  //     setErrorMessage("交易失败");
+  //     setStatusMessage(null);
+  //     setPendingHash(undefined);
+  //   }
+  // }, [result.isSuccess, result.isError, onClaimSuccess]);
+
+  // 领取红包
   const handleClaim = useCallback(async () => {
     if (!isConnected || !address) {
       setErrorMessage("请先连接钱包");
@@ -149,13 +127,33 @@ export default function WagmiButtonList({
         abi: contractAbi,
         functionName: "getRedPacked",
       });
-      setPendingHash(hash);
+      await waitForTransactionReceipt(wagmiConfig, { hash });
+      onClaimSuccess?.();
+      // setPendingHash(hash);
     } catch (err) {
       const message = extractErrorMessage(err);
       setErrorMessage(message);
       setStatusMessage(`领取失败：${message}`);
     }
   }, [address, isConnected, writeContractAsync]);
+  // 清空红包
+  const handleClear = useCallback(async () => {
+    if (!isConnected || !address) {
+      setErrorMessage("请先连接钱包");
+      setStatusMessage(null);
+      return;
+    }
+    try {
+      const hash = await writeContractAsync({
+        address: address,
+        abi: contractAbi,
+        functionName: "clear",
+      });
+      await waitForTransactionReceipt(wagmiConfig, { hash });
+      onClaimSuccess?.();
+    } catch (error) {}
+  }, []);
+  // 存入红包
   const handleDeposit = useCallback(async () => {
     if (!address) {
       setErrorMessage("请先连接钱包");
@@ -191,7 +189,8 @@ export default function WagmiButtonList({
       });
       setDepositAmount("");
       setStatusMessage("存入成功");
-      setPendingHash(hash);
+      await waitForTransactionReceipt(wagmiConfig, { hash });
+      onClaimSuccess?.();
     } catch (error) {
       if (error instanceof BaseError) {
         setErrorMessage(error.shortMessage ?? error.message);
@@ -208,28 +207,19 @@ export default function WagmiButtonList({
         <button
           type="button"
           className={styles.primaryBtn}
-          onClick={openModal}
-          disabled={isConnectPending}
-        >
-          {isConnected ? "已连接" : isConnectPending ? "连接中..." : "链接钱包"}
-        </button>
-        <button
-          type="button"
-          className={styles.secondaryBtn}
-          onClick={handleDisconnect}
-          disabled={!isConnected || isDisconnectPending}
-        >
-          {isDisconnectPending ? "断开中..." : "断开链接"}
-        </button>
-        <button
-          type="button"
-          className={styles.primaryBtn}
           onClick={handleClaim}
           disabled={!isConnected || isWritePending || Boolean(pendingHash)}
         >
           {isWritePending || pendingHash ? "领取中..." : "领取红包"}
         </button>
-
+        <button
+          type="button"
+          className={styles.primaryBtn}
+          onClick={handleClear}
+          disabled={!isConnected || isWritePending || Boolean(pendingHash)}
+        >
+          清空红包
+        </button>
         {statusMessage ? (
           <div className={styles.statusPill} style={{ marginTop: "1rem" }}>
             {statusMessage}
@@ -261,49 +251,6 @@ export default function WagmiButtonList({
           {isWritePending || isConfirming ? "存入中..." : "存入金额"}
         </button>
       </div>
-
-      {isModalOpen
-        ? createPortal(
-            <div className={styles.modalOverlay} onClick={closeModal}>
-              <div
-                className={styles.modalContent}
-                onClick={(event) => event.stopPropagation()}
-              >
-                <div className={styles.modalHeader}>
-                  <h3 className={styles.modalTitle}>选择要连接的钱包</h3>
-                  <button
-                    type="button"
-                    className={styles.closeBtn}
-                    onClick={closeModal}
-                    aria-label="关闭"
-                  >
-                    ×
-                  </button>
-                </div>
-                <div className={styles.connectorList}>
-                  {connectors.length === 0 ? (
-                    <p className={styles.connectorEmpty}>暂无可用连接器</p>
-                  ) : (
-                    connectors.map((connector) => (
-                      <button
-                        key={connector.uid}
-                        type="button"
-                        className={styles.connectorBtn}
-                        onClick={() => void performConnect(connector)}
-                        disabled={isConnectPending}
-                      >
-                        <span className={styles.connectorName}>
-                          {connector.name}
-                        </span>
-                      </button>
-                    ))
-                  )}
-                </div>
-              </div>
-            </div>,
-            document.body
-          )
-        : null}
     </>
   );
 }

@@ -1,7 +1,8 @@
 "use client";
-
+import { ethers } from "ethers";
 import type { ReactNode } from "react";
 import styles from "./styles.module.css";
+import { formatTimestamp } from "../../utils/utils";
 
 export interface WalletInfoDisplay {
   address?: string | null;
@@ -26,7 +27,7 @@ export interface ContractInfoDisplay {
 }
 
 export interface ClaimRecordDisplay {
-  address: string;
+  addr: string;
   amount: string;
   time: string;
   key?: ReactNode;
@@ -151,7 +152,9 @@ export default function InformationPanel({
         {contractLoading ? (
           <p className={styles.muted}>正在读取合约信息...</p>
         ) : contractError ? (
-          <p className={`${styles.muted} ${styles.errorText}`}>{contractError}</p>
+          <p className={`${styles.muted} ${styles.errorText}`}>
+            {contractError}
+          </p>
         ) : contractInfo ? (
           <div className={styles.dataList}>
             {contractRows.map(({ label, value }) => (
@@ -178,22 +181,27 @@ export default function InformationPanel({
           <div className={styles.dataList}>
             {claimRecords.map((record, index) => (
               <div
-                key={record.key ?? `${record.address}-${record.time}-${index}`}
+                key={`${record.addr}-${record.time}-${index}`}
                 className={styles.claimEntry}
               >
                 <div className={styles.dataItem}>
+                  <span>序号</span>
+                  <strong>{index + 1}</strong>
+                </div>
+                <div className={styles.dataItem}>
                   <span className={styles.label}>领取人</span>
-                  <span className={styles.value}>{record.address}</span>
+                  <span className={styles.value}>{record.addr}</span>
                 </div>
                 <div className={styles.dataItem}>
                   <span className={styles.label}>领取金额</span>
                   <span className={styles.value}>{record.amount}</span>
                 </div>
-                <div className={styles.recordMeta}>
-                  <span>序号</span>
-                  <strong>{index + 1}</strong>
-                  <span>·</span>
-                  <span>{record.time}</span>
+
+                <div className={styles.dataItem}>
+                  <span className={styles.label}>时间</span>
+                  <span className={styles.value}>
+                    {formatTimestamp(Number(record.time))}
+                  </span>
                 </div>
               </div>
             ))}

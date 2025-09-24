@@ -8,6 +8,7 @@ import {
   InformationPanel,
   DepositSection,
   EthersWalletActions,
+  type ClaimRecordDisplay,
 } from "@/app/components";
 
 const ABI = (contractAbi as { abi: ethers.InterfaceAbi }).abi;
@@ -33,8 +34,10 @@ const EthersPage = () => {
   );
   const [totalCountResult, setTotalCountResult] = useState<string | null>(null);
   const [isEqualResult, setIsEqualResult] = useState<boolean | null>(null);
-  const [userList, setUserList] = useState([]);
+  const [userList, setUserList] = useState<ClaimRecordDisplay[]>([]);
   const [contractError, setContractError] = useState<string | null>(null);
+  // 状态
+  const [isSubmitting, setIsSubitting] = useState(false);
   // 输入金额
   const [amount, setAmount] = useState<string>("");
   // 清空红包
@@ -43,11 +46,13 @@ const EthersPage = () => {
       setError("请先连接钱包");
       return;
     }
+    console.log("444");
     try {
       const signer = await provideRef.current.getSigner();
       const contract = new ethers.Contract(CONTRACT_ADDRESS, ABI, signer);
       const tx = await contract.clearRedPacked();
       await tx.wait();
+      console.log("清空成999功");
 
       // 领取成功后刷新账户和合约信息
       await GetAccount({ account });
@@ -66,7 +71,7 @@ const EthersPage = () => {
     try {
       const signer = await provideRef.current.getSigner();
       const contract = new ethers.Contract(CONTRACT_ADDRESS, ABI, signer);
-      const tx = await contract.claim();
+      const tx = await contract.getRedPacked();
       await tx.wait();
 
       // 领取成功后刷新账户和合约信息
@@ -100,15 +105,19 @@ const EthersPage = () => {
       return;
     }
     setDepositing(true);
+
     try {
       const signer = await provideRef.current.getSigner();
-      const tx = new ethers.Contract(CONTRACT_ADDRESS, ABI, signer);
-      const hash = await tx.deposit({ value: amountInWei });
-      return hash;
+      const contract = new ethers.Contract(CONTRACT_ADDRESS, ABI, signer);
+      const tx = await contract.deposit({ value: amountInWei });
+      await tx.wait();
+      console.log("成功");
+      await GetAccount({ account: account });
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
       setDepositing(false);
+      console.log("刷新数据");
     }
   };
   // 断开钱包连接
@@ -125,30 +134,30 @@ const EthersPage = () => {
     setContractError(null);
   };
   // 链接钱包
-  const connectWallet = async () => {
-    if (!window.ethereum) {
-      alert("请安装 MetaMask 钱包");
-      return;
-    }
-    setIsConnected(true);
-    if (!provideRef.current) {
-      provideRef.current = new ethers.BrowserProvider(
-        window.ethereum as ethers.Eip1193Provider
-      );
-    }
-    const accounts = (await (window.ethereum as ethers.Eip1193Provider).request(
-      {
-        method: "eth_requestAccounts",
-      }
-    )) as string[];
+  // const connectWallet = async () => {
+  //   if (!window.ethereum) {
+  //     alert("请安装 MetaMask 钱包");
+  //     return;
+  //   }
+  //   setIsConnected(true);
+  //   if (!provideRef.current) {
+  //     provideRef.current = new ethers.BrowserProvider(
+  //       window.ethereum as ethers.Eip1193Provider
+  //     );
+  //   }
+  //   const accounts = (await (window.ethereum as ethers.Eip1193Provider).request(
+  //     {
+  //       method: "eth_requestAccounts",
+  //     }
+  //   )) as string[];
 
-    if (!accounts || accounts.length === 0) {
-      setError("未返回任何账户");
-      return;
-    }
-    await GetAccount({ account: accounts[0] });
-    setIsConnected(false);
-  };
+  //   if (!accounts || accounts.length === 0) {
+  //     setError("未返回任何账户");
+  //     return;
+  //   }
+  //   await GetAccount({ account: accounts[0] });
+  //   setIsConnected(false);
+  // };
   // 主动链接钱包
   const isOpen = () => {
     setIsOpen(!isOpen);
@@ -156,7 +165,7 @@ const EthersPage = () => {
   // 获取合约信息
   const getContractInfo = () => {
     console.log("getContractInfo");
-    if (provideRef.current) {
+    if (!provideRef.current) {
       setError("先链接钱包");
       return;
     }
@@ -166,20 +175,31 @@ const EthersPage = () => {
       provideRef.current
     );
     // 获取用户用户信息
-    contract.owners().then((owner) => {
+    contract.owner().then((owner) => {
       setOwnerResult(owner);
     });
     contract.totalBalance().then((totalBalance) => {
-      setTotalBalanceResult(totalBalance);
+      console.log("**99**", ethers.formatEther(totalBalance));
+
+      setTotalBalanceResult(ethers.formatEther(totalBalance));
     });
     contract.totalCount().then((totalCount) => {
+      console.log("****", totalCount);
       setTotalCountResult(totalCount);
     });
     contract.isEqual().then((isEqual) => {
       setIsEqualResult(isEqual);
     });
-    contract.getUser().then((getUser) => {
-      setUserList(getUser);
+    contract.getUser().then((result) => {
+      const userList: ClaimRecordDisplay[] = result.map((item: any) => {
+        return {
+          addr: item[0],
+          amount: ethers.formatEther(item[1]),
+          time: item[2],
+        };
+      });
+      console.log(result);
+      setUserList(userList);
     });
   };
   // 根据账户信息获取当前账户详细信息
@@ -193,23 +213,24 @@ const EthersPage = () => {
     const balance = await provideRef.current.getBalance(account);
     // 获取网络数据
     const network = await provideRef.current.getNetwork();
+    console.log(network, balance);
     setNetwork(network);
     setBalance(`${ethers.formatEther(balance)}`);
     getContractInfo();
   };
   // 如果已经链接就获取用户账户信息
-  const GetWallet = async () => {
-    const accounts = (await (window.ethereum as ethers.Eip1193Provider).request(
-      {
-        method: "eth_accounts",
-      }
-    )) as string[];
-    console.log(accounts);
-    if (accounts.length > 0) {
-      setAccount(accounts[0]);
-      await GetAccount({ account: accounts[0] });
-    }
-  };
+  // const GetWallet = async () => {
+  //   const accounts = (await (window.ethereum as ethers.Eip1193Provider).request(
+  //     {
+  //       method: "eth_accounts",
+  //     }
+  //   )) as string[];
+  //   console.log(accounts);
+  //   if (accounts.length > 0) {
+  //     setAccount(accounts[0]);
+  //     await GetAccount({ account: accounts[0] });
+  //   }
+  // };
   // 默认进入校验钱包
   useEffect(() => {
     if (!window.ethereum) {
@@ -264,30 +285,45 @@ const EthersPage = () => {
         <div className=" py-4">
           <EthersWalletActions
             isCleared={account === ownerResult}
-            onClear={() => {}}
+            onClear={async () => {
+              await clearRedPacked();
+            }}
             onClaim={async (provider) => {
               await claim();
             }}
             onConnectSuccess={({ address, provider }) => {
               setAccount(address);
               provideRef.current = provider;
-              getContractInfo();
+              GetAccount({ account: address });
             }}
           />
         </div>
         {account === ownerResult && (
           <DepositSection
+            isSubmitting={isDepositing}
             value={amount}
             onChange={setAmount}
             onSubmit={deposit}
           />
         )}
         <InformationPanel
+          isConnected={account !== null}
           walletInfo={{
             address: account,
             network: network?.name,
             balance: balance,
           }}
+          contractInfo={{
+            contractAddress: CONTRACT_ADDRESS,
+            owner: ownerResult,
+            totalBalance: `${totalBalanceResult} ETH`,
+            totalCount: totalCountResult,
+            isEqual: isEqualResult,
+          }}
+          claimRecords={userList.map((item: ClaimRecordDisplay) => ({
+            ...item,
+            key: Math.random(),
+          }))}
         />
       </section>
     </main>

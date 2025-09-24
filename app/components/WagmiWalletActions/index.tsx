@@ -1,15 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import {
-  useAccount,
-  useConnect,
-  useDisconnect,
-  type Connector,
-} from "wagmi";
+import { useAccount, useConnect, useDisconnect, type Connector } from "wagmi";
 import { BaseError } from "viem";
-import { createPortal } from "react-dom";
-import styles from "./styles.module.css";
+import LinkButton from "./LinkBtn";
+// import { createPortal } from "react-dom";
+// import styles from "./styles.module.css";
 
 const extractErrorMessage = (err: unknown) => {
   if (!err) return "未知错误";
@@ -56,48 +52,49 @@ export default function WagmiWalletActions({
   claimDisabled,
   claimLoading,
 }: WagmiWalletActionsProps) {
-  const { address, status: accountStatus, chain } = useAccount();
+  // 获取当前账户信息
+  const {
+    address,
+    status: accountStatus,
+    chain,
+    isConnected,
+    isConnecting,
+  } = useAccount();
+  // 获取链接账户信息的hooks
   const {
     connectAsync,
     connectors,
     isPending: isConnectPending,
   } = useConnect();
-  const { disconnectAsync, isPending: isDisconnectPending } = useDisconnect();
 
+  console.log("====", connectors);
+  const { disconnectAsync, isPending: isDisconnectPending } = useDisconnect();
+  const [isClient, setIsClient] = useState(true);
+  const [isClaimingInternal, setIsClaimingInternal] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isClient, setIsClient] = useState(false);
-  const [isClaimingInternal, setIsClaimingInternal] = useState(false);
-
+  // 用于解决 hydration 问题
   useEffect(() => {
     setIsClient(true);
   }, []);
-
-  const readyConnectors = useMemo(
-    () => connectors.filter((item) => item.ready),
-    [connectors]
-  );
-
-  const closeModal = useCallback(() => {
-    setIsModalOpen(false);
-  }, []);
-
+  // 选择钱包进行连接
   const performConnect = useCallback(
     async (connector: Connector) => {
       try {
         setStatusMessage(`正在连接 ${connector.name}...`);
         setErrorMessage(null);
         const result = await connectAsync({ connector });
-        const connectedAddress =
-          result.account?.address ?? address ?? result.accounts?.[0] ?? "";
-        if (connectedAddress) {
-          await onConnectSuccess?.({
-            address: connectedAddress,
-            connector,
-            chainId: result.chain?.id ?? chain?.id,
-          });
-        }
+        console.log("result", result);
+        // const connectedAddress =
+        //   result.account?.address ?? address ?? result.accounts?.[0] ?? "";
+        // if (connectedAddress) {
+        //   await onConnectSuccess?.({
+        //     address: connectedAddress,
+        //     connector,
+        //     chainId: result.chain?.id ?? chain?.id,
+        //   });
+        // }
         setStatusMessage("钱包连接成功");
         setIsModalOpen(false);
       } catch (err) {
@@ -109,87 +106,103 @@ export default function WagmiWalletActions({
     [address, chain?.id, connectAsync, onConnectSuccess]
   );
 
-  const handleConnect = useCallback(() => {
-    if (readyConnectors.length === 0) {
-      setStatusMessage("暂无可用钱包连接器");
-      setErrorMessage(null);
-      return;
-    }
+  //
+  //
+  // const [isModalOpen, setIsModalOpen] = useState(false);
+  //
+  // const [isClaimingInternal, setIsClaimingInternal] = useState(false);
 
-    if (readyConnectors.length === 1) {
-      void performConnect(readyConnectors[0]!);
-      return;
-    }
+  // const closeModal = useCallback(() => {
+  //   setIsModalOpen(false);
+  // }, []);
 
-    setStatusMessage(null);
-    setErrorMessage(null);
-    setIsModalOpen(true);
-  }, [performConnect, readyConnectors]);
+  // const handleConnect = useCallback(() => {
+  //   // if (readyConnectors.length === 0) {
+  //   //   setStatusMessage("暂无可用钱包连接器");
+  //   //   setErrorMessage(null);
+  //   //   return;
+  //   // }
 
-  const handleDisconnect = useCallback(async () => {
-    if (accountStatus !== "connected") {
-      setStatusMessage("当前没有连接的钱包");
-      setErrorMessage(null);
-      return;
-    }
+  //   // if (readyConnectors.length === 1) {
+  //   //   void performConnect(readyConnectors[0]!);
+  //   //   return;
+  //   // }
 
-    try {
-      setStatusMessage("断开连接中...");
-      setErrorMessage(null);
-      await disconnectAsync();
-      setStatusMessage("已断开钱包连接");
-      setIsModalOpen(false);
-    } catch (err) {
-      const message = extractErrorMessage(err);
-      setErrorMessage(message);
-      setStatusMessage(`断开失败：${message}`);
-    }
-  }, [accountStatus, disconnectAsync]);
+  //   setStatusMessage(null);
+  //   setErrorMessage(null);
+  //   setIsModalOpen(true);
+  // }, [performConnect]);
 
-  const handleClaim = useCallback(async () => {
-    if (!onClaim) {
-      setErrorMessage("未提供领取红包的方法");
-      setStatusMessage(null);
-      return;
-    }
+  // const handleDisconnect = useCallback(async () => {
+  //   if (accountStatus !== "connected") {
+  //     setStatusMessage("当前没有连接的钱包");
+  //     setErrorMessage(null);
+  //     return;
+  //   }
 
-    try {
-      setIsClaimingInternal(true);
-      setStatusMessage("领取中...");
-      setErrorMessage(null);
-      await onClaim();
-      setStatusMessage("领取请求已发送");
-    } catch (err) {
-      const message = extractErrorMessage(err);
-      setErrorMessage(message);
-      setStatusMessage(`领取失败：${message}`);
-      onClaimError?.(err);
-    } finally {
-      setIsClaimingInternal(false);
-    }
-  }, [onClaim, onClaimError, writeContractAsync]);
+  //   try {
+  //     setStatusMessage("断开连接中...");
+  //     setErrorMessage(null);
+  //     await disconnectAsync();
+  //     setStatusMessage("已断开钱包连接");
+  //     setIsModalOpen(false);
+  //   } catch (err) {
+  //     const message = extractErrorMessage(err);
+  //     setErrorMessage(message);
+  //     setStatusMessage(`断开失败：${message}`);
+  //   }
+  // }, [accountStatus, disconnectAsync]);
+
+  // const handleClaim = useCallback(async () => {
+  //   if (!onClaim) {
+  //     setErrorMessage("未提供领取红包的方法");
+  //     setStatusMessage(null);
+  //     return;
+  //   }
+
+  //   try {
+  //     setIsClaimingInternal(true);
+  //     setStatusMessage("领取中...");
+  //     setErrorMessage(null);
+  //     await onClaim();
+  //     setStatusMessage("领取请求已发送");
+  //   } catch (err) {
+  //     const message = extractErrorMessage(err);
+  //     setErrorMessage(message);
+  //     setStatusMessage(`领取失败：${message}`);
+  //     onClaimError?.(err);
+  //   } finally {
+  //     setIsClaimingInternal(false);
+  //   }
+  // }, [onClaim, onClaimError]);
+
+  // 只在客户端渲染时显示真实状态
+  // const connectButtonText = !isClient
+  //   ? "链接钱包" // 服务器端默认显示
+  //   : isConnected
+  //   ? "已连接"
+  //   : isConnecting
+  //   ? "连接中..."
+  //   : "链接钱包";
 
   const isClaimInFlight = claimLoading ?? isClaimingInternal;
-
   return (
     <>
-      <div className={styles.buttonList}>
+      <LinkButton />
+      {/* <div className={styles.buttonList}>
         <button
           type="button"
           className={styles.primaryBtn}
-          onClick={handleConnect}
+          onClick={() => {
+            // setIsModalOpen(true);
+          }}
           disabled={isConnectPending}
         >
-          {accountStatus === "connected"
-            ? "已连接"
-            : isConnectPending
-            ? "连接中..."
-            : "链接钱包"}
+          链接钱包
         </button>
         <button
           type="button"
           className={styles.secondaryBtn}
-          onClick={handleDisconnect}
           disabled={accountStatus !== "connected" || isDisconnectPending}
         >
           {isDisconnectPending ? "断开中..." : "断开链接"}
@@ -197,11 +210,8 @@ export default function WagmiWalletActions({
         <button
           type="button"
           className={styles.primaryBtn}
-          onClick={handleClaim}
           disabled={
-            claimDisabled ||
-            accountStatus !== "connected" ||
-            isClaimInFlight
+            claimDisabled || accountStatus !== "connected" || isClaimInFlight
           }
         >
           {isClaimInFlight ? "领取中..." : "领取红包"}
@@ -219,7 +229,12 @@ export default function WagmiWalletActions({
 
       {isClient && isModalOpen
         ? createPortal(
-            <div className={styles.modalOverlay} onClick={closeModal}>
+            <div
+              className={styles.modalOverlay}
+              onClick={() => {
+                setIsModalOpen(false);
+              }}
+            >
               <div
                 className={styles.modalContent}
                 onClick={(event) => event.stopPropagation()}
@@ -229,7 +244,9 @@ export default function WagmiWalletActions({
                   <button
                     type="button"
                     className={styles.closeBtn}
-                    onClick={closeModal}
+                    onClick={() => {
+                      setIsModalOpen(false);
+                    }}
                     aria-label="关闭"
                   >
                     ×
@@ -245,13 +262,9 @@ export default function WagmiWalletActions({
                         type="button"
                         className={styles.connectorBtn}
                         onClick={() => void performConnect(connector)}
-                        disabled={!connector.ready || isConnectPending}
                       >
                         <span className={styles.connectorName}>
                           {connector.name}
-                        </span>
-                        <span className={styles.connectorHint}>
-                          {connector.ready ? "可用" : "不可用"}
                         </span>
                       </button>
                     ))
@@ -261,7 +274,7 @@ export default function WagmiWalletActions({
             </div>,
             document.body
           )
-        : null}
+        : null} */}
     </>
   );
 }
