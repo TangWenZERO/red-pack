@@ -91,7 +91,9 @@ const Container = () => {
     () => ({
       address,
       network: chain?.name,
-      balance: balanceData ? `${formatEther(balanceData.value)} ETH` : undefined,
+      balance: balanceData
+        ? `${formatEther(balanceData.value)} ETH`
+        : undefined,
     }),
     [address, balanceData, chain]
   );
@@ -135,9 +137,7 @@ const Container = () => {
           自动维护数据缓存。
         </p>
         <div>
-          <WagmiButtonList
-            onActionComplete={refreshAllData}
-          />
+          <WagmiButtonList onActionComplete={refreshAllData} />
         </div>
         <InformationPanel
           walletInfo={walletInfo}

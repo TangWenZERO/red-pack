@@ -26,4 +26,4 @@ export const formatTimestamp = (value?: number | bigint | null) => {
   }).format(date);
 };
 export const CONTRACT_ADDRESS =
-  "0x4A679253410272dd5232B3Ff7cF5dbB88f295319" as const;
+  "0xC09a6A8c976F645A794c85b1281505A015bf5b63" as const;
