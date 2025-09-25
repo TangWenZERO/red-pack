@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useAccount, useConnect, useDisconnect, type Connector } from "wagmi";
 import { BaseError } from "viem";
 import LinkButton from "./LinkBtn";
@@ -14,10 +14,16 @@ const extractErrorMessage = (err: unknown) => {
     return (
       err.shortMessage ||
       err.message ||
-      (err.cause && "shortMessage" in err.cause
+      (err.cause &&
+      typeof err.cause === "object" &&
+      err.cause !== null &&
+      "shortMessage" in err.cause
         ? (err.cause as { shortMessage?: string }).shortMessage
         : undefined) ||
-      (err.cause && "message" in err.cause
+      (err.cause &&
+      typeof err.cause === "object" &&
+      err.cause !== null &&
+      "message" in err.cause
         ? (err.cause as { message?: string }).message
         : undefined) ||
       "未知错误"
@@ -47,19 +53,10 @@ export interface WagmiWalletActionsProps {
 
 export default function WagmiWalletActions({
   onConnectSuccess,
-  onClaim,
-  onClaimError,
-  claimDisabled,
   claimLoading,
 }: WagmiWalletActionsProps) {
   // 获取当前账户信息
-  const {
-    address,
-    status: accountStatus,
-    chain,
-    isConnected,
-    isConnecting,
-  } = useAccount();
+  const { address, chain } = useAccount();
   // 获取链接账户信息的hooks
   const {
     connectAsync,
@@ -68,7 +65,6 @@ export default function WagmiWalletActions({
   } = useConnect();
 
   console.log("====", connectors);
-  const { disconnectAsync, isPending: isDisconnectPending } = useDisconnect();
   const [isClient, setIsClient] = useState(true);
   const [isClaimingInternal, setIsClaimingInternal] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
