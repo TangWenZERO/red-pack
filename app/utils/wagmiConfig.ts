@@ -6,8 +6,9 @@ const projectId = "<WALLETCONNECT_PROJECT_ID>";
 
 export const wagmiConfig = createConfig(
   getDefaultConfig({
-    chains: [hardhat],
+    chains: [sepolia],
     transports: {
+      [sepolia.id]: http(),
       [hardhat.id]: http(
         hardhat.rpcUrls.default.http[0] ?? "http://127.0.0.1:8545"
       ),

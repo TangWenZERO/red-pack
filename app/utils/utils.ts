@@ -27,3 +27,7 @@ export const formatTimestamp = (value?: number | bigint | null) => {
 };
 export const CONTRACT_ADDRESS =
   "0xC09a6A8c976F645A794c85b1281505A015bf5b63" as const;
+export const CONTRACT_TTS_TOKEN_ADDRESS =
+  "0x5C3C809f423cE629163c32E6B835B8780e86b4A1" as const;
+export const CONTRACT_LOG_ADDRESS =
+  "0x07A412A312A223056102983697516c08fcd89EcF" as const;

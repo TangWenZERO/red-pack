@@ -2,7 +2,7 @@
 import { ethers } from "ethers";
 import type { ReactNode } from "react";
 import styles from "./styles.module.css";
-import { formatTimestamp } from "../../utils/utils";
+import { formatTimestamp } from "../../../utils/utils";
 
 export interface WalletInfoDisplay {
   address?: string | null;
