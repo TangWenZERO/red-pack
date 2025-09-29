@@ -27,3 +27,6 @@ export const formatTimestamp = (value?: number | bigint | null) => {
 };
 export const CONTRACT_ADDRESS =
   "0xC09a6A8c976F645A794c85b1281505A015bf5b63" as const;
+
+export const LOG_CONTRACT_ADDRESS =
+  "0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9" as const;
