@@ -102,8 +102,10 @@ const ListData = forwardRef<ChildRef, ChildProps>((props, ref) => {
 
             {/* 表体 */}
             <tbody className="divide-y divide-gray-200">
-              {(listArray as TransferRecordSubmittedEvent[])?.map(
-                (item: TransferRecordSubmittedEvent, index: number) => {
+              {(listArray as TransferRecordSubmittedEvent[])
+                ?.slice() // 创建数组副本以避免修改原数组
+                .sort((a, b) => Number(b.timestamp - a.timestamp)) // 按时间戳倒序排列
+                .map((item: TransferRecordSubmittedEvent, index: number) => {
                   return (
                     <tr
                       key={item.id.toString()}
@@ -196,8 +198,7 @@ const ListData = forwardRef<ChildRef, ChildProps>((props, ref) => {
                       </td>
                     </tr>
                   );
-                }
-              )}
+                })}
             </tbody>
           </table>
         </div>
