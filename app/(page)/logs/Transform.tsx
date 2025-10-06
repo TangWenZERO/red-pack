@@ -7,7 +7,8 @@ import {
   useImperativeHandle,
   useState,
 } from "react";
-import LogABI from "@/app/abi/DataLogger.json";
+// import LogABI from "@/app/abi/DataLogger.json";
+import LogABI from "@/app/abi/USDTDataStorage_test.json";
 import { parseEther, type Abi } from "viem";
 import { waitForTransactionReceipt, writeContract } from "wagmi/actions";
 import { wagmiConfig } from "@/app/utils/wagmiConfig";

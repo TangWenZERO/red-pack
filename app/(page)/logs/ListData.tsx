@@ -2,7 +2,8 @@ import { LOG_CONTRACT_ADDRESS } from "@/app/utils/utils";
 import { forwardRef, useImperativeHandle } from "react";
 import { useReadContract } from "wagmi";
 import { parseEther, type Abi } from "viem";
-import LogABI from "@/app/abi/DataLogger.json";
+// import LogABI from "@/app/abi/DataLogger.json";
+import LogABI from "@/app/abi/USDTDataStorage_test.json";
 
 const ABI = (LogABI as { abi: Abi }).abi;
 const BaseConfig = {

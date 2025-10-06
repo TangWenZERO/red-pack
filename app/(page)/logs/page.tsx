@@ -14,7 +14,6 @@ import {
 } from "wagmi/actions";
 import { ConnectKitProvider, ConnectKitButton } from "connectkit";
 
-import { LOG_CONTRACT_ADDRESS } from "@/app/utils/utils";
 import { wagmiConfig } from "@/app/utils/wagmiConfig";
 import ListData, { ChildRef } from "./ListData";
 import AddLogs from "./Transform";
