@@ -10,6 +10,7 @@ import {
   EthersWalletActions,
   type ClaimRecordDisplay,
 } from "@/app/components";
+import { message } from "antd";
 
 const ABI = (contractAbi as { abi: ethers.InterfaceAbi }).abi;
 const EthersPage = () => {
@@ -40,10 +41,53 @@ const EthersPage = () => {
   const [isSubmitting, setIsSubitting] = useState(false);
   // 输入金额
   const [amount, setAmount] = useState<string>("");
+
+  // 使用message hook
+  const [messageApi, contextHolder] = message.useMessage();
+
+  // 解析错误信息的函数
+  const parseErrorMessage = (error: any): string => {
+    // 如果是字符串直接返回
+    if (typeof error === "string") {
+      return error;
+    }
+
+    // 尝试获取reason字段
+    if (error.reason) {
+      return error.reason;
+    }
+
+    // 尝试从data中解析错误信息
+    if (error.data) {
+      try {
+        // 检查是否是Error(string)编码格式
+        // Error(string)的函数选择器是0x08c379a0
+        if (
+          typeof error.data === "string" &&
+          error.data.startsWith("0x08c379a0")
+        ) {
+          // 解码错误信息
+          const decoded = ethers.AbiCoder.defaultAbiCoder().decode(
+            ["string"],
+            "0x" + error.data.slice(10) // 去掉前缀0x08c379a0
+          );
+          if (decoded && decoded[0]) {
+            return decoded[0];
+          }
+        }
+      } catch (decodeError) {
+        console.error("解码错误信息失败:", decodeError);
+      }
+    }
+
+    // 返回默认错误信息
+    return error.message || error.toString() || "未知错误";
+  };
+
   // 清空红包
   const clearRedPacked = async () => {
     if (!provideRef.current || !account) {
-      setError("请先连接钱包");
+      messageApi.error("请先连接钱包");
       return;
     }
     console.log("444");
@@ -57,14 +101,16 @@ const EthersPage = () => {
       // 领取成功后刷新账户和合约信息
       await GetAccount({ account });
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      const errorMsg = parseErrorMessage(err);
+      messageApi.error(errorMsg);
+      setError(errorMsg);
       throw err;
     }
   };
   // 领取红包
   const claim = async () => {
     if (!provideRef.current || !account) {
-      setError("请先连接钱包");
+      messageApi.error("请先连接钱包");
       return;
     }
 
@@ -76,20 +122,23 @@ const EthersPage = () => {
 
       // 领取成功后刷新账户和合约信息
       await GetAccount({ account });
+      messageApi.success("红包领取成功！");
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      const errorMsg = parseErrorMessage(err);
+      messageApi.error(errorMsg);
+      setError(errorMsg);
       throw err;
     }
   };
   // 存红包
   const deposit = async () => {
     if (!provideRef.current || !account) {
-      setError("请先连接钱包");
+      messageApi.error("请先连接钱包");
       return;
     }
     const amountText = amount.trim();
     if (!amountText) {
-      setError("请输入存入金额");
+      messageApi.error("请输入存入金额");
       return;
     }
 
@@ -97,11 +146,11 @@ const EthersPage = () => {
     try {
       amountInWei = ethers.parseEther(amountText);
     } catch (err) {
-      setError("请输入合法的 ETH 金额");
+      messageApi.error("请输入合法的 ETH 金额");
       return;
     }
     if (amountInWei <= 0) {
-      setError("金额必须大于 0");
+      messageApi.error("金额必须大于 0");
       return;
     }
     setDepositing(true);
@@ -111,10 +160,13 @@ const EthersPage = () => {
       const contract = new ethers.Contract(CONTRACT_ADDRESS, ABI, signer);
       const tx = await contract.deposit({ value: amountInWei });
       await tx.wait();
-      console.log("成功");
+      // console.log("成功");
+      messageApi.success("红包存入成功！");
       await GetAccount({ account: account });
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      const errorMsg = parseErrorMessage(err);
+      messageApi.error(errorMsg);
+      // setError(errorMsg);
     } finally {
       setDepositing(false);
       console.log("刷新数据");
@@ -166,7 +218,7 @@ const EthersPage = () => {
   const getContractInfo = () => {
     console.log("getContractInfo");
     if (!provideRef.current) {
-      setError("先链接钱包");
+      messageApi.error("先链接钱包");
       return;
     }
     const contract = new ethers.Contract(
@@ -190,22 +242,29 @@ const EthersPage = () => {
     contract.isEqual().then((isEqual) => {
       setIsEqualResult(isEqual);
     });
-    contract.getUser().then((result) => {
-      const userList: ClaimRecordDisplay[] = result.map((item: any) => {
-        return {
-          addr: item[0],
-          amount: `${ethers.formatEther(item[1])} ETH`,
-          time: item[2],
-        };
+    contract
+      .getUser()
+      .then((result) => {
+        const userList: ClaimRecordDisplay[] = result.map((item: any) => {
+          return {
+            addr: item[0],
+            amount: `${ethers.formatEther(item[1])} ETH`,
+            time: item[2],
+          };
+        });
+        console.log(result);
+        setUserList(userList);
+      })
+      .catch((err) => {
+        const errorMsg = parseErrorMessage(err);
+        messageApi.error(errorMsg);
+        // setContractError(errorMsg);
       });
-      console.log(result);
-      setUserList(userList);
-    });
   };
   // 根据账户信息获取当前账户详细信息
   const GetAccount = async ({ account }: { account: string }) => {
     if (!account || !provideRef.current) {
-      setError("请先连接钱包");
+      messageApi.error("请先连接钱包");
       disconnectWallet();
       return;
     }
@@ -234,7 +293,7 @@ const EthersPage = () => {
   // 默认进入校验钱包
   useEffect(() => {
     if (!window.ethereum) {
-      setError("请先安装钱包");
+      messageApi.error("请先安装钱包");
       disconnectWallet();
       return;
     }
@@ -274,6 +333,8 @@ const EthersPage = () => {
   }, []);
   return (
     <main className={styles.pageShell}>
+      {/* 添加contextHolder */}
+      {contextHolder}
       <section className={styles.panel}>
         <div className={styles.statePill}>ethers.js</div>
         <h1>使用 ethers.js 连接钱包</h1>
