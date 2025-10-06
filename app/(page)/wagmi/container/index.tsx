@@ -70,19 +70,27 @@ const Container = () => {
     | readonly [string, bigint, bigint];
 
   const claimRecords = useMemo<ClaimRecord[]>(() => {
-    if (!Array.isArray(getUserData)) {
-      return [];
-    }
+    if (!Array.isArray(getUserData)) return [];
 
     return (getUserData as ReadonlyArray<RawUser>).map((item) => {
-      const normalized = Array.isArray(item)
-        ? { addr: item[0], amount: item[1], time: item[2] }
-        : item;
+      // 解构元组或对象，统一处理
+      let addr: string;
+      let amount: bigint;
+      let time: bigint;
+
+      if (Array.isArray(item)) {
+        [addr, amount, time] = item;
+      } else {
+        addr = (item as { addr: string; amount: bigint; time: bigint }).addr;
+        amount = (item as { addr: string; amount: bigint; time: bigint })
+          .amount;
+        time = (item as { addr: string; amount: bigint; time: bigint }).time;
+      }
 
       return {
-        addr: normalized.addr,
-        amount: `${formatEther(normalized.amount)} ETH`,
-        time: normalized.time.toString(),
+        addr,
+        amount: `${formatEther(amount)} ETH`,
+        time: time.toString(),
       };
     });
   }, [getUserData]);
@@ -137,7 +145,10 @@ const Container = () => {
           自动维护数据缓存。
         </p>
         <div>
-          <WagmiButtonList onActionComplete={refreshAllData} />
+          <WagmiButtonList
+            onActionComplete={refreshAllData}
+            owner={contractInfo?.owner || ""}
+          />
         </div>
         <InformationPanel
           walletInfo={walletInfo}

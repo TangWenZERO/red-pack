@@ -16,13 +16,8 @@ const links = [
   },
   {
     href: "/logs",
-    title: "实现兑换ETH为USDT、转账USDT、查询USDT",
+    title: "做mapping日志记录",
     description: "通过 ethers.js 实现",
-  },
-  {
-    href: "/cool",
-    title: "酷炫展示页",
-    description: "磨砂玻璃风格的创意空白页",
   },
 ];
 

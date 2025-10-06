@@ -1,4 +1,5 @@
 import { LOG_CONTRACT_ADDRESS } from "@/app/utils/utils";
+import { message } from "antd";
 import {
   Dispatch,
   forwardRef,
@@ -27,6 +28,8 @@ type ChildProps = {
 };
 
 const AddLogs = forwardRef<ChildRef, ChildProps>((props, ref) => {
+  const [messageApi, contextHolder] = message.useMessage();
+
   const { callback } = props;
   const { address, isConnected } = useAccount();
   const [formData, setFormData] = useState<FormData>({
@@ -50,18 +53,23 @@ const AddLogs = forwardRef<ChildRef, ChildProps>((props, ref) => {
       });
       const data = await waitForTransactionReceipt(wagmiConfig, { hash });
       console.log("hash:", hash, data);
+      messageApi.success("转账记录提交成功！");
       callback?.();
       // childRef.current?.refetch();
     } catch (error: any) {
       // 检查是否是用户拒绝了请求
       if (error?.code === 4001) {
         console.log("用户拒绝了请求");
+        messageApi.error("用户拒绝了请求");
       } else if (error?.code === -32603) {
         console.log("内部JSON-RPC错误");
+        messageApi.error("内部JSON-RPC错误");
       } else if (error?.name === "TransactionExecutionError") {
         console.log("交易执行错误");
+        messageApi.error("交易执行错误");
       } else {
         console.error("Transfer error:", error);
+        messageApi.error(`Transfer error:${error}`);
       }
     } finally {
       // 提交后清空表单
@@ -86,7 +94,7 @@ const AddLogs = forwardRef<ChildRef, ChildProps>((props, ref) => {
 
   const handleSubmit = () => {
     if (!formData.from || !formData.to || !formData.amount || !formData.log) {
-      alert("请填写所有必填项！");
+      messageApi.warning("请填写所有必填项！");
       return;
     }
 
@@ -97,6 +105,7 @@ const AddLogs = forwardRef<ChildRef, ChildProps>((props, ref) => {
 
   return (
     <div className="w-full max-w-7xl mx-auto p-6">
+      {contextHolder}
       {/* 标题 */}
       <div className="mb-6">
         <h2 className="text-2xl font-bold text-gray-800">

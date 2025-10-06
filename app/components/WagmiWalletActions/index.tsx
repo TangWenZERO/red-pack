@@ -14,10 +14,10 @@ const extractErrorMessage = (err: unknown) => {
     return (
       err.shortMessage ||
       err.message ||
-      (err.cause && "shortMessage" in err.cause
+      (err.cause && typeof err.cause === 'object' && err.cause !== null && "shortMessage" in err.cause
         ? (err.cause as { shortMessage?: string }).shortMessage
         : undefined) ||
-      (err.cause && "message" in err.cause
+      (err.cause && typeof err.cause === 'object' && err.cause !== null && "message" in err.cause
         ? (err.cause as { message?: string }).message
         : undefined) ||
       "未知错误"

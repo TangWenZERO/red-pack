@@ -1,6 +1,6 @@
 // wagmiConfig.ts
 import { createConfig, http } from "wagmi";
-import { hardhat } from "wagmi/chains";
+import { hardhat, sepolia } from "wagmi/chains";
 import { getDefaultConfig } from "connectkit";
 
 // 从环境变量获取 WalletConnect Project ID，如果不存在则使用默认值

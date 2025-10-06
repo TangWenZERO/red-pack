@@ -194,7 +194,7 @@ const EthersPage = () => {
       const userList: ClaimRecordDisplay[] = result.map((item: any) => {
         return {
           addr: item[0],
-          amount: ethers.formatEther(item[1]),
+          amount: `${ethers.formatEther(item[1])} ETH`,
           time: item[2],
         };
       });
@@ -284,7 +284,11 @@ const EthersPage = () => {
 
         <div className=" py-4">
           <EthersWalletActions
-            isCleared={account === ownerResult}
+            isCleared={
+              ownerResult !== null &&
+              ownerResult !== "" &&
+              account === ownerResult
+            }
             onClear={async () => {
               await clearRedPacked();
             }}
@@ -298,7 +302,7 @@ const EthersPage = () => {
             }}
           />
         </div>
-        {account === ownerResult && (
+        {account !== null && account !== "" && account === ownerResult && (
           <DepositSection
             isSubmitting={isDepositing}
             value={amount}

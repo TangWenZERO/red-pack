@@ -45,6 +45,7 @@ const extractErrorMessage = (err: unknown) => {
 
 type WagmiButtonListProps = {
   onActionComplete?: () => Promise<void> | void;
+  owner: string;
 };
 
 type ActionType = "claim" | "clear" | "deposit";
@@ -57,6 +58,7 @@ const actionLabels: Record<ActionType, string> = {
 
 export default function WagmiButtonList({
   onActionComplete,
+  owner,
 }: WagmiButtonListProps) {
   const [depositAmount, setDepositAmount] = useState("");
   const { address, isConnected } = useAccount();
@@ -94,6 +96,7 @@ export default function WagmiButtonList({
         }
       } catch (err) {
         const message = extractErrorMessage(err);
+        console.log("message:", err);
         setErrorMessage(message);
         setStatusMessage(`${actionLabels[action]}失败：${message}`);
       } finally {
@@ -172,8 +175,10 @@ export default function WagmiButtonList({
     );
   }, [depositAmount, requireConnection, runTransaction]);
 
-  const claimLabel = activeAction === "claim" ? "领取中..." : actionLabels.claim;
-  const clearLabel = activeAction === "clear" ? "清空中..." : actionLabels.clear;
+  const claimLabel =
+    activeAction === "claim" ? "领取中..." : actionLabels.claim;
+  const clearLabel =
+    activeAction === "clear" ? "清空中..." : actionLabels.clear;
   const depositLabel =
     activeAction === "deposit" ? "存入中..." : actionLabels.deposit;
 
@@ -205,30 +210,32 @@ export default function WagmiButtonList({
           <div className={styles.errorBox}>{errorMessage}</div>
         ) : null}
       </div>
-      <div className={styles.depositRow}>
-        <input
-          className={styles.inputField}
-          type="number"
-          min="0"
-          step="0.0001"
-          placeholder="请输入存入的 ETH 数量"
-          value={depositAmount}
-          onChange={(event) => setDepositAmount(event.target.value)}
-          disabled={isProcessing}
-        />
-        <button
-          type="button"
-          className={styles.primaryBtn}
-          onClick={handleDeposit}
-          disabled={
-            requireConnection ||
-            isProcessing ||
-            depositAmount.trim().length === 0
-          }
-        >
-          {depositLabel}
-        </button>
-      </div>
+      {address === owner && (
+        <div className={styles.depositRow}>
+          <input
+            className={styles.inputField}
+            type="number"
+            min="0"
+            step="0.0001"
+            placeholder="请输入存入的 ETH 数量"
+            value={depositAmount}
+            onChange={(event) => setDepositAmount(event.target.value)}
+            disabled={isProcessing}
+          />
+          <button
+            type="button"
+            className={styles.primaryBtn}
+            onClick={handleDeposit}
+            disabled={
+              requireConnection ||
+              isProcessing ||
+              depositAmount.trim().length === 0
+            }
+          >
+            {depositLabel}
+          </button>
+        </div>
+      )}
     </>
   );
 }
