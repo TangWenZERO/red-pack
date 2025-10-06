@@ -96,7 +96,7 @@ export default function WagmiButtonList({
         }
       } catch (err) {
         const message = extractErrorMessage(err);
-        console.log("message:", err);
+        console.error("message:", err);
         setErrorMessage(message);
         setStatusMessage(`${actionLabels[action]}失败：${message}`);
       } finally {
