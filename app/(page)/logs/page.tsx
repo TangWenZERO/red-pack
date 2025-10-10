@@ -78,8 +78,10 @@ export function TransferPage() {
       </div>
       <AddLogs
         setIsLoading={setIsLoading}
-        callback={() => {
-          childRef.current?.refetch();
+        callback={async () => {
+          setIsLoading(true);
+          await childRef.current?.refetch();
+          console.log("refetch");
           setTimeout(() => {
             setIsLoading(false);
           }, 100);

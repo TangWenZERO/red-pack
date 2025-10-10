@@ -1,4 +1,7 @@
-import { LOG_CONTRACT_ADDRESS } from "@/app/utils/utils";
+import {
+  LOG_CONTRACT_ADDRESS,
+  Local_LOG_CONTRACT_ADDRESS,
+} from "@/app/utils/utils";
 import { message } from "antd";
 import {
   Dispatch,
@@ -7,8 +10,7 @@ import {
   useImperativeHandle,
   useState,
 } from "react";
-// import LogABI from "@/app/abi/DataLogger.json";
-import LogABI from "@/app/abi/USDTDataStorage_test.json";
+import LogABI from "@/app/abi/DataLogger.json";
 import { parseEther, type Abi } from "viem";
 import { waitForTransactionReceipt, writeContract } from "wagmi/actions";
 import { wagmiConfig } from "@/app/utils/wagmiConfig";
@@ -40,6 +42,8 @@ const AddLogs = forwardRef<ChildRef, ChildProps>((props, ref) => {
     log: "",
   });
   const transfer = async () => {
+    console.log("transfer", parseEther(formData.amount));
+    props.setIsLoading(true);
     try {
       const hash = await writeContract(wagmiConfig, {
         address: LOG_CONTRACT_ADDRESS,
@@ -73,6 +77,7 @@ const AddLogs = forwardRef<ChildRef, ChildProps>((props, ref) => {
         messageApi.error(`Transfer error:${error}`);
       }
     } finally {
+      props.setIsLoading(false);
       // 提交后清空表单
       setFormData({
         from: "",

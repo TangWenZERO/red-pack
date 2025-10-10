@@ -1,9 +1,12 @@
-import { LOG_CONTRACT_ADDRESS } from "@/app/utils/utils";
+import {
+  LOG_CONTRACT_ADDRESS,
+  Local_LOG_CONTRACT_ADDRESS,
+} from "@/app/utils/utils";
 import { forwardRef, useImperativeHandle } from "react";
 import { useReadContract } from "wagmi";
-import { parseEther, type Abi } from "viem";
-// import LogABI from "@/app/abi/DataLogger.json";
-import LogABI from "@/app/abi/USDTDataStorage_test.json";
+import { parseEther, ReadContractErrorType, type Abi } from "viem";
+import LogABI from "@/app/abi/DataLogger.json";
+import { QueryObserverResult } from "@tanstack/react-query";
 
 const ABI = (LogABI as { abi: Abi }).abi;
 const BaseConfig = {
@@ -24,7 +27,7 @@ type TransferRecordSubmittedEvent = {
 interface ChildProps {}
 
 export interface ChildRef {
-  refetch: () => void;
+  refetch: () => Promise<QueryObserverResult<unknown, ReadContractErrorType>>;
 }
 
 const ListData = forwardRef<ChildRef, ChildProps>((props, ref) => {
@@ -34,7 +37,7 @@ const ListData = forwardRef<ChildRef, ChildProps>((props, ref) => {
   });
 
   useImperativeHandle(ref, () => ({
-    refetch,
+    refetch: refetch,
   }));
 
   // 格式化时间戳
